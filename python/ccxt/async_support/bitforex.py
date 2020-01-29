@@ -43,7 +43,7 @@ class bitforex(Exchange):
             },
             'timeframes': {
                 '1m': '1min',
-                '5m': 'M5',
+                '5m': '5min',
                 '15m': '15min',
                 '30m': '30min',
                 '1h': '1hour',
