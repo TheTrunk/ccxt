@@ -42,14 +42,14 @@ const enableRateLimit = true
 
 const { Agent } = require ('https')
 
-const agent = new Agent ({
+const httpsAgent = new Agent ({
     ecdhCurve: 'auto',
 })
 
 const timeout = 20000
 
 const exchange = new (ccxt)[exchangeId] ({
-    agent,
+    httpsAgent,
     verbose,
     enableRateLimit,
     debug,
@@ -297,21 +297,21 @@ let testExchange = async exchange => {
     // } catch (e) {
     //     console.log (exchange.id, 'error', 'market sell', e)
     // }
-
+    //
     // try {
     //     let marketBuyOrder = await exchange.createMarketBuyOrder (exchange.symbols[0], 1)
     //     console.log (exchange.id, 'ok', marketBuyOrder)
     // } catch (e) {
     //     console.log (exchange.id, 'error', 'market buy', e)
     // }
-
+    //
     // try {
     //     let limitSellOrder = await exchange.createLimitSellOrder (exchange.symbols[0], 1, 3000)
     //     console.log (exchange.id, 'ok', limitSellOrder)
     // } catch (e) {
     //     console.log (exchange.id, 'error', 'limit sell', e)
     // }
-
+    //
     // try {
     //     let limitBuyOrder = await exchange.createLimitBuyOrder (exchange.symbols[0], 1, 3000)
     //     console.log (exchange.id, 'ok', limitBuyOrder)

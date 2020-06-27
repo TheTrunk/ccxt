@@ -18,7 +18,8 @@ class bitvavo extends Exchange {
             'countries' => array( 'NL' ), // Netherlands
             'rateLimit' => 500,
             'version' => 'v2',
-            'certified' => false,
+            'certified' => true,
+            'pro' => true,
             'has' => array(
                 'CORS' => false,
                 'publicAPI' => true,
@@ -547,7 +548,7 @@ class bitvavo extends Exchange {
         return $this->parse_trades($response, $market, $since, $limit);
     }
 
-    public function parse_trade($trade, $market) {
+    public function parse_trade($trade, $market = null) {
         //
         // fetchTrades (public)
         //
@@ -588,6 +589,22 @@ class bitvavo extends Exchange {
         //         "settled":true
         //     }
         //
+        // watchMyTrades (private)
+        //
+        //     {
+        //         event => 'fill',
+        //         $timestamp => 1590964470132,
+        //         $market => 'ETH-EUR',
+        //         $orderId => '85d082e1-eda4-4209-9580-248281a29a9a',
+        //         fillId => '861d2da5-aa93-475c-8d9a-dce431bd4211',
+        //         $side => 'sell',
+        //         $amount => '0.1',
+        //         $price => '211.46',
+        //         $taker => true,
+        //         $fee => '0.056',
+        //         feeCurrency => 'EUR'
+        //     }
+        //
         $price = $this->safe_float($trade, 'price');
         $amount = $this->safe_float($trade, 'amount');
         $cost = null;
@@ -596,7 +613,7 @@ class bitvavo extends Exchange {
         }
         $timestamp = $this->safe_integer($trade, 'timestamp');
         $side = $this->safe_string($trade, 'side');
-        $id = $this->safe_string($trade, 'id');
+        $id = $this->safe_string_2($trade, 'id', 'fillId');
         $marketId = $this->safe_integer($trade, 'market');
         $symbol = null;
         if ($marketId !== null) {
@@ -675,7 +692,7 @@ class bitvavo extends Exchange {
         return $orderbook;
     }
 
-    public function parse_ohlcv($ohlcv, $market = null, $timeframe = '1m', $since = null, $limit = null) {
+    public function parse_ohlcv($ohlcv, $market = null) {
         //
         //     array(
         //         1590383700000,
@@ -1145,7 +1162,7 @@ class bitvavo extends Exchange {
         //
         $id = $this->safe_string($order, 'orderId');
         $timestamp = $this->safe_integer($order, 'created');
-        $marketId = $this->safe_integer($order, 'market');
+        $marketId = $this->safe_string($order, 'market');
         $symbol = null;
         if ($marketId !== null) {
             if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
