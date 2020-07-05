@@ -36,10 +36,11 @@ module.exports = class bittrex extends Exchange {
                 'fetchTransactions': false,
             },
             'timeframes': {
-                '1m': 'MINUTE_1',
-                '5m': 'MINUTE_5',
-                '1h': 'HOUR_1',
-                '1d': 'DAY_1',
+                '1m': 'oneMin',
+                '5m': 'fiveMin',
+                '30m': 'thirtyMin',
+                '1h': 'hour',
+                '1d': 'day',
             },
             'hostname': 'bittrex.com',
             'urls': {
@@ -110,6 +111,17 @@ module.exports = class bittrex extends Exchange {
                         'markets/{marketSymbol}/ticker',
                         'markets/{marketSymbol}/candles',
                         'markets/{marketSymbol}/candles/{candleInterval}/historical/{year}/{month}/{day}',
+                    ],
+                },
+                'v2': {
+                    'get': [
+                        'currencies/GetBTCPrice',
+                        'currencies/GetWalletHealth',
+                        'general/GetLatestAlert',
+                        'market/GetTicks',
+                        'market/GetLatestTick',
+                        'Markets/GetMarketSummaries',
+                        'market/GetLatestTick',
                     ],
                 },
                 'public': {
@@ -639,36 +651,16 @@ module.exports = class bittrex extends Exchange {
     async fetchOHLCV (symbol, timeframe = '1m', since = undefined, limit = undefined, params = {}) {
         await this.loadMarkets ();
         const market = this.market (symbol);
-        const reverseId = market['baseId'] + '-' + market['quoteId'];
         const request = {
-            'candleInterval': this.timeframes[timeframe],
-            'marketSymbol': reverseId,
+            'tickInterval': this.timeframes[timeframe],
+            'marketName': market['id'],
         };
-        let method = 'v3publicGetMarketsMarketSymbolCandles';
-        if (since !== undefined) {
-            const now = this.milliseconds ();
-            const difference = Math.abs (now - since);
-            if (difference > 86400000) {
-                method = 'v3publicGetMarketsMarketSymbolCandlesCandleIntervalHistoricalYearMonthDay';
-                const date = this.ymd (since);
-                const parts = date.split ('-');
-                const year = this.safeInteger (parts, 0);
-                const month = this.safeInteger (parts, 1);
-                const day = this.safeInteger (parts, 2);
-                request['year'] = year;
-                request['month'] = month;
-                request['day'] = day;
+        const response = await this.v2GetMarketGetTicks (this.extend (request, params));
+        if ('result' in response) {
+            if (response['result']) {
+                return this.parseOHLCVs (response['result'], market, timeframe, since, limit);
             }
         }
-        const response = await this[method] (this.extend (request, params));
-        //
-        //     [
-        //         {"startsAt":"2020-06-12T02:35:00Z","open":"0.02493753","high":"0.02493753","low":"0.02493753","close":"0.02493753","volume":"0.09590123","quoteVolume":"0.00239153"},
-        //         {"startsAt":"2020-06-12T02:40:00Z","open":"0.02491874","high":"0.02491874","low":"0.02490970","close":"0.02490970","volume":"0.04515695","quoteVolume":"0.00112505"},
-        //         {"startsAt":"2020-06-12T02:45:00Z","open":"0.02490753","high":"0.02493143","low":"0.02490753","close":"0.02493143","volume":"0.17769640","quoteVolume":"0.00442663"}
-        //     ]
-        //
-        return this.parseOHLCVs (response, market, timeframe, since, limit);
     }
 
     async fetchOpenOrders (symbol = undefined, since = undefined, limit = undefined, params = {}) {
