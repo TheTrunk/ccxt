@@ -2,11 +2,11 @@
 
 // ---------------------------------------------------------------------------
 
-const okex = require ('./okex.js');
+const okex3 = require ('./okex3.js');
 
 // ---------------------------------------------------------------------------
 
-module.exports = class okcoin extends okex {
+module.exports = class okcoin extends okex3 {
     describe () {
         return this.deepExtend (super.describe (), {
             'id': 'okcoin',
@@ -15,7 +15,7 @@ module.exports = class okcoin extends okex {
             'hostname': 'okcoin.com',
             'pro': true,
             'urls': {
-                'logo': 'https://user-images.githubusercontent.com/1294454/27766791-89ffb502-5ee5-11e7-8a5b-c5950b68ac65.jpg',
+                'logo': 'https://user-images.githubusercontent.com/51840849/87295551-102fbf00-c50e-11ea-90a9-462eebba5829.jpg',
                 'www': 'https://www.okcoin.com',
                 'doc': 'https://www.okcoin.com/docs/en/',
                 'fees': 'https://www.okcoin.com/coin-fees',

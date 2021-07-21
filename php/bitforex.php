@@ -17,19 +17,20 @@ class bitforex extends Exchange {
             'countries' => array( 'CN' ),
             'version' => 'v1',
             'has' => array(
-                'fetchBalance' => true,
-                'fetchMarkets' => true,
-                'createOrder' => true,
                 'cancelOrder' => true,
+                'createOrder' => true,
+                'fetchBalance' => true,
+                'fetchClosedOrders' => true,
+                'fetchMarkets' => true,
+                'fetchMyTrades' => false,
+                'fetchOHLCV' => true,
+                'fetchOpenOrders' => true,
+                'fetchOrder' => true,
+                'fetchOrderBook' => true,
+                'fetchOrders' => false,
                 'fetchTicker' => true,
                 'fetchTickers' => false,
-                'fetchMyTrades' => false,
                 'fetchTrades' => true,
-                'fetchOrder' => true,
-                'fetchOrders' => false,
-                'fetchOpenOrders' => true,
-                'fetchClosedOrders' => true,
-                'fetchOHLCV' => true,
             ),
             'timeframes' => array(
                 '1m' => '1min',
@@ -45,7 +46,7 @@ class bitforex extends Exchange {
                 '1M' => '1month',
             ),
             'urls' => array(
-                'logo' => 'https://user-images.githubusercontent.com/1294454/44310033-69e9e600-a3d8-11e8-873d-54d74d1bc4e4.jpg',
+                'logo' => 'https://user-images.githubusercontent.com/51840849/87295553-1160ec00-c50e-11ea-8ea0-df79276a9646.jpg',
                 'api' => 'https://api.bitforex.com',
                 'www' => 'https://www.bitforex.com',
                 'doc' => 'https://github.com/githubdev2020/API_Doc_en/wiki',
@@ -69,7 +70,9 @@ class bitforex extends Exchange {
                         'api/v1/trade/placeOrder',
                         'api/v1/trade/placeMultiOrder',
                         'api/v1/trade/cancelOrder',
+                        'api/v1/trade/cancelMultiOrder',
                         'api/v1/trade/orderInfo',
+                        'api/v1/trade/multiOrderInfo',
                         'api/v1/trade/orderInfos',
                     ),
                 ),
@@ -223,13 +226,25 @@ class bitforex extends Exchange {
                 ),
             ),
             'commonCurrencies' => array(
+                'ACE' => 'ACE Entertainment',
+                'CAPP' => 'Crypto Application Token',
+                'CREDIT' => 'TerraCredit',
+                'CTC' => 'Culture Ticket Chain',
+                'GOT' => 'GoNetwork',
+                'HBC' => 'Hybrid Bank Cash',
+                'IQ' => 'IQ.Cash',
+                'MIR' => 'MIR COIN',
                 'UOS' => 'UOS Network',
             ),
             'exceptions' => array(
                 '4004' => '\\ccxt\\OrderNotFound',
                 '1013' => '\\ccxt\\AuthenticationError',
                 '1016' => '\\ccxt\\AuthenticationError',
+                '1017' => '\\ccxt\\PermissionDenied', // array("code":"1017","success":false,"time":1602670594367,"message":"IP not allow")
+                '1019' => '\\ccxt\\BadSymbol', // array("code":"1019","success":false,"time":1607087743778,"message":"Symbol Invalid")
                 '3002' => '\\ccxt\\InsufficientFunds',
+                '4002' => '\\ccxt\\InvalidOrder', // array("success":false,"code":"4002","message":"Price unreasonable")
+                '4003' => '\\ccxt\\InvalidOrder', // array("success":false,"code":"4003","message":"amount too small")
                 '10204' => '\\ccxt\\DDoSProtection',
             ),
         ));
@@ -255,7 +270,7 @@ class bitforex extends Exchange {
             );
             $limits = array(
                 'amount' => array(
-                    'min' => $this->safe_float($market, 'minOrderAmount'),
+                    'min' => $this->safe_number($market, 'minOrderAmount'),
                     'max' => null,
                 ),
                 'price' => array(
@@ -291,14 +306,11 @@ class bitforex extends Exchange {
         $timestamp = $this->safe_integer($trade, 'time');
         $id = $this->safe_string($trade, 'tid');
         $orderId = null;
-        $amount = $this->safe_float($trade, 'amount');
-        $price = $this->safe_float($trade, 'price');
-        $cost = null;
-        if ($price !== null) {
-            if ($amount !== null) {
-                $cost = $amount * $price;
-            }
-        }
+        $priceString = $this->safe_string($trade, 'price');
+        $amountString = $this->safe_string($trade, 'amount');
+        $price = $this->parse_number($priceString);
+        $amount = $this->parse_number($amountString);
+        $cost = $this->parse_number(Precise::string_mul($priceString, $amountString));
         $sideId = $this->safe_integer($trade, 'direction');
         $side = $this->parse_side($sideId);
         return array(
@@ -341,9 +353,9 @@ class bitforex extends Exchange {
             $currencyId = $this->safe_string($balance, 'currency');
             $code = $this->safe_currency_code($currencyId);
             $account = $this->account();
-            $account['used'] = $this->safe_float($balance, 'frozen');
-            $account['free'] = $this->safe_float($balance, 'active');
-            $account['total'] = $this->safe_float($balance, 'fix');
+            $account['used'] = $this->safe_string($balance, 'frozen');
+            $account['free'] = $this->safe_string($balance, 'active');
+            $account['total'] = $this->safe_string($balance, 'fix');
             $result[$code] = $account;
         }
         return $this->parse_balance($result);
@@ -362,34 +374,45 @@ class bitforex extends Exchange {
             'symbol' => $symbol,
             'timestamp' => $timestamp,
             'datetime' => $this->iso8601($timestamp),
-            'high' => $this->safe_float($data, 'high'),
-            'low' => $this->safe_float($data, 'low'),
-            'bid' => $this->safe_float($data, 'buy'),
+            'high' => $this->safe_number($data, 'high'),
+            'low' => $this->safe_number($data, 'low'),
+            'bid' => $this->safe_number($data, 'buy'),
             'bidVolume' => null,
-            'ask' => $this->safe_float($data, 'sell'),
+            'ask' => $this->safe_number($data, 'sell'),
             'askVolume' => null,
             'vwap' => null,
             'open' => null,
-            'close' => $this->safe_float($data, 'last'),
-            'last' => $this->safe_float($data, 'last'),
+            'close' => $this->safe_number($data, 'last'),
+            'last' => $this->safe_number($data, 'last'),
             'previousClose' => null,
             'change' => null,
             'percentage' => null,
             'average' => null,
-            'baseVolume' => $this->safe_float($data, 'vol'),
+            'baseVolume' => $this->safe_number($data, 'vol'),
             'quoteVolume' => null,
             'info' => $response,
         );
     }
 
-    public function parse_ohlcv($ohlcv, $market = null, $timeframe = '1m', $since = null, $limit = null) {
+    public function parse_ohlcv($ohlcv, $market = null) {
+        //
+        //     {
+        //         "close":0.02505143,
+        //         "currencyVol":0,
+        //         "high":0.02506422,
+        //         "low":0.02505143,
+        //         "open":0.02506095,
+        //         "time":1591508940000,
+        //         "vol":51.1869
+        //     }
+        //
         return array(
             $this->safe_integer($ohlcv, 'time'),
-            $this->safe_float($ohlcv, 'open'),
-            $this->safe_float($ohlcv, 'high'),
-            $this->safe_float($ohlcv, 'low'),
-            $this->safe_float($ohlcv, 'close'),
-            $this->safe_float($ohlcv, 'vol'),
+            $this->safe_number($ohlcv, 'open'),
+            $this->safe_number($ohlcv, 'high'),
+            $this->safe_number($ohlcv, 'low'),
+            $this->safe_number($ohlcv, 'close'),
+            $this->safe_number($ohlcv, 'vol'),
         );
     }
 
@@ -404,8 +427,19 @@ class bitforex extends Exchange {
             $request['size'] = $limit; // default 1, max 600
         }
         $response = $this->publicGetApiV1MarketKline (array_merge($request, $params));
-        $ohlcvs = $this->safe_value($response, 'data', array());
-        return $this->parse_ohlcvs($ohlcvs, $market, $timeframe, $since, $limit);
+        //
+        //     {
+        //         "$data":array(
+        //             array("close":0.02505143,"currencyVol":0,"high":0.02506422,"low":0.02505143,"open":0.02506095,"time":1591508940000,"vol":51.1869),
+        //             array("close":0.02503914,"currencyVol":0,"high":0.02506687,"low":0.02503914,"open":0.02505358,"time":1591509000000,"vol":9.1082),
+        //             array("close":0.02505172,"currencyVol":0,"high":0.02507466,"low":0.02503895,"open":0.02506371,"time":1591509060000,"vol":63.7431),
+        //         ),
+        //         "success":true,
+        //         "time":1591509427131
+        //     }
+        //
+        $data = $this->safe_value($response, 'data', array());
+        return $this->parse_ohlcvs($data, $market, $timeframe, $since, $limit);
     }
 
     public function fetch_order_book($symbol, $limit = null, $params = array ()) {
@@ -420,7 +454,7 @@ class bitforex extends Exchange {
         $response = $this->publicGetApiV1MarketDepth (array_merge($request, $params));
         $data = $this->safe_value($response, 'data');
         $timestamp = $this->safe_integer($response, 'time');
-        return $this->parse_order_book($data, $timestamp, 'bids', 'asks', 'price', 'amount');
+        return $this->parse_order_book($data, $symbol, $timestamp, 'bids', 'asks', 'price', 'amount');
     }
 
     public function parse_order_status($status) {
@@ -446,26 +480,24 @@ class bitforex extends Exchange {
 
     public function parse_order($order, $market = null) {
         $id = $this->safe_string($order, 'orderId');
-        $timestamp = $this->safe_float($order, 'createTime');
-        $lastTradeTimestamp = $this->safe_float($order, 'lastTime');
+        $timestamp = $this->safe_number($order, 'createTime');
+        $lastTradeTimestamp = $this->safe_number($order, 'lastTime');
         $symbol = $market['symbol'];
         $sideId = $this->safe_integer($order, 'tradeType');
         $side = $this->parse_side($sideId);
         $type = null;
-        $price = $this->safe_float($order, 'orderPrice');
-        $average = $this->safe_float($order, 'avgPrice');
-        $amount = $this->safe_float($order, 'orderAmount');
-        $filled = $this->safe_float($order, 'dealAmount');
-        $remaining = $amount - $filled;
+        $price = $this->safe_number($order, 'orderPrice');
+        $average = $this->safe_number($order, 'avgPrice');
+        $amount = $this->safe_number($order, 'orderAmount');
+        $filled = $this->safe_number($order, 'dealAmount');
         $status = $this->parse_order_status($this->safe_string($order, 'orderState'));
-        $cost = $filled * $price;
         $feeSide = ($side === 'buy') ? 'base' : 'quote';
         $feeCurrency = $market[$feeSide];
         $fee = array(
-            'cost' => $this->safe_float($order, 'tradeFee'),
+            'cost' => $this->safe_number($order, 'tradeFee'),
             'currency' => $feeCurrency,
         );
-        $result = array(
+        return $this->safe_order(array(
             'info' => $order,
             'id' => $id,
             'clientOrderId' => null,
@@ -474,18 +506,20 @@ class bitforex extends Exchange {
             'lastTradeTimestamp' => $lastTradeTimestamp,
             'symbol' => $symbol,
             'type' => $type,
+            'timeInForce' => null,
+            'postOnly' => null,
             'side' => $side,
             'price' => $price,
-            'cost' => $cost,
+            'stopPrice' => null,
+            'cost' => null,
             'average' => $average,
             'amount' => $amount,
             'filled' => $filled,
-            'remaining' => $remaining,
+            'remaining' => null,
             'status' => $status,
             'fee' => $fee,
             'trades' => null,
-        );
-        return $result;
+        ));
     }
 
     public function fetch_order($id, $symbol = null, $params = array ()) {
