@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 from pprint import pprint
@@ -34,16 +37,14 @@ async def run():
     exchange = ccxt.binance({
         'apiKey': 'YOUR_API_KEY',
         'secret': 'YOUR_SECRET',
-        'enableRateLimit': True
     })
     symbol = 'BTC/USDT'
     everything = {
         'spot': await load(exchange, symbol, 'spot'),
-        'future': await load(exchange, symbol, 'future'),
+        'swap': await load(exchange, symbol, 'swap'),
     }
     await exchange.close()
     return everything
 
 
-if __name__ == '__main__':
-    pprint(asyncio.get_event_loop().run_until_complete(run()))
+run(run())

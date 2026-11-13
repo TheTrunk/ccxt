@@ -1,0 +1,103 @@
+// AUTO_TRANSPILE_ENABLED
+
+
+
+import assert from 'assert';
+import ccxt from '../../../ccxt.js';
+
+function helperTestHandleMarketTypeAndParams () {
+    const exchange = new ccxt.Exchange ({
+        'id': 'sampleexchange',
+        'options': {
+            'defaultType': 'option',
+            'fetchX': {
+                'defaultType': 'valueFromMethodOptions',
+            },
+        },
+    });
+    const initialParams = { 'defaultType': 'valueFromParam' };
+    const market = exchange.safeMarket ('TEST1/TEST2');
+    market['type'] = 'spot';
+    //
+    // ########### test different variations ###########
+    //
+    // case #1, should prevail: param
+    //
+    const [ marketType1, params1 ] = exchange.handleMarketTypeAndParams ('fetchX', market, initialParams, 'valueDefault');
+    assert ('defaultType' in initialParams);
+    assert (!('defaultType' in params1));
+    assert (marketType1 === 'valueFromParam');
+    //
+    // case #2, should prevail: market.type
+    //
+    const [ marketType2, params2 ] = exchange.handleMarketTypeAndParams ('fetchX', market, {}, 'valueDefault');
+    assert (marketType2 === 'spot');
+    //
+    // case #3, should prevail: valueDefault
+    //
+    const [ marketType3, params3 ] = exchange.handleMarketTypeAndParams ('fetchX', undefined, {}, 'valueDefault');
+    assert (marketType3 === 'valueDefault');
+    //
+    // case #4, should prevail: method options
+    //
+    const [ marketType4, params4 ] = exchange.handleMarketTypeAndParams ('fetchX', undefined, {});
+    assert (marketType4 === 'valueFromMethodOptions');
+    //
+    // case #5, should prevail: options
+    //
+    const [ marketType5, params5 ] = exchange.handleMarketTypeAndParams ('fetchY', undefined, {}, undefined);
+    assert (marketType5 === 'option');
+    //
+    // case #6, should prevail: spot (because hardcoded in base)
+    //
+    exchange.options['defaultType'] = undefined;
+    const [ marketType6, params6 ] = exchange.handleMarketTypeAndParams ('fetchY', undefined, {}, undefined);
+    assert (marketType6 === 'spot');
+    // fake assertion to avoid unused vars
+    assert (params1 !== undefined || params2 !== undefined || params3 !== undefined || params4 !== undefined || params5 !== undefined || params6 !== undefined);
+}
+
+function helperTestHandleTypedOptions () {
+    const exchange = new ccxt.Exchange ({
+        'id': 'sampleexchange',
+        'options': {
+            'marginMode': 'isolated',
+            'fetchX': {
+                'uta': true,
+                'boolString': 'false',
+                'boolNumber': 1,
+            },
+        },
+    });
+    const [ marginMode, params1 ] = exchange.handleMarginModeAndParams ('fetchX', {}, 'cross');
+    assert (marginMode === 'isolated');
+    const [ uta, params2 ] = exchange.handleOptionBoolAndParams ({}, 'fetchX', 'uta', false);
+    assert (uta);
+    const [ absent, params3 ] = exchange.handleOptionStringAndParams ({}, 'fetchX', 'absentKey', 'fallback');
+    assert (absent === 'fallback');
+    const [ fromParams, params4 ] = exchange.handleOptionStringAndParams ({ 'absentKey': 'p' }, 'fetchX', 'absentKey', 'fallback');
+    assert (fromParams === 'p');
+    assert (!('absentKey' in params4));
+    // "true"/"false" strings and 1/0 numbers read as booleans; any other present non-boolean throws
+    const [ boolString, params5 ] = exchange.handleOptionBoolAndParams ({}, 'fetchX', 'boolString', true);
+    assert (boolString === false);
+    const [ boolNumber, params6 ] = exchange.handleOptionBoolAndParams ({ 'boolNumber': 1 }, 'fetchX', 'boolNumber', false);
+    assert (boolNumber === true);
+    assert (!('boolNumber' in params6));
+    let caught = false;
+    try {
+        exchange.checkOptionBool ('fetchX', 'wrongBool', 'yes');
+    } catch (error) {
+        caught = true;
+    }
+    assert (caught, 'a non-boolean option should have thrown');
+    assert (params5 !== undefined);
+    assert (params1 !== undefined || params2 !== undefined || params3 !== undefined);
+}
+
+function testHandleMethods () {
+    helperTestHandleMarketTypeAndParams ();
+    helperTestHandleTypedOptions ();
+}
+
+export default testHandleMethods;

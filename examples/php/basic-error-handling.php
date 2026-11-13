@@ -1,12 +1,12 @@
 <?php
 
-$root = dirname (dirname (dirname (__FILE__)));
+$root = dirname(dirname(dirname(__FILE__)));
 
 include $root . '/ccxt.php';
 
-date_default_timezone_set ('UTC');
+date_default_timezone_set('UTC');
 
-$exchange = new \ccxt\bittrex ();
+$exchange = new \ccxt\kucoin ();
 
 $message = null;
 
@@ -18,10 +18,10 @@ try {
 } catch (Exception $e) {
 
     // print it
-    echo $e->getMessage () . "\n";
+    echo $e->getMessage() . "\n";
 
     // save to $message (for whatever needs)
-    $message = $e->getMessage ();
+    $message = $e->getMessage();
 }
 
 ?>

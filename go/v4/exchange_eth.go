@@ -1,0 +1,1757 @@
+package ccxt
+
+import (
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"math/big"
+	"reflect"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	"github.com/vmihailenco/msgpack/v5"
+	"golang.org/x/crypto/sha3"
+
+	"github.com/elliottech/lighter-go/client"
+	"github.com/elliottech/lighter-go/client/http"
+	"github.com/elliottech/lighter-go/types"
+	// "github.com/elliottech/lighter-go/types/txtypes"
+)
+
+// =====================================  Hyperliquid Structs ===================================== //
+// OrderMessage Struct
+// {
+// "builder": "0xxxxxx",
+// "grouping": "na",
+// "orders": [
+//
+//	   {
+//		  "a": 159,
+//		  "b": true,
+//		  "p": "26.25",
+//		  "r": false,
+//		  "s": "1000",
+//		  "t": {
+//			 "limit": {
+//				"tif": "Ioc"
+//			 }
+//		  }
+//	   }
+//
+// ],
+// "type": "order"
+// }
+type TimeInForce struct {
+	TIF string `json:"tif" msgpack:"tif"`
+}
+
+type TriggerSpec struct {
+	IsMarket  bool   `json:"isMarket" msgpack:"isMarket"`
+	TriggerPx string `json:"triggerPx" msgpack:"triggerPx"`
+	TPSL      string `json:"tpsl" msgpack:"tpsl"`
+}
+
+type OrderKind struct {
+	Limit   *TimeInForce `json:"limit" msgpack:"limit,omitempty"`
+	Trigger *TriggerSpec `json:"trigger" msgpack:"trigger,omitempty"`
+}
+
+type OrderHyperliquid struct {
+	A int       `json:"a" msgpack:"a"`
+	B bool      `json:"b" msgpack:"b"`
+	P string    `json:"p" msgpack:"p"`
+	S string    `json:"s" msgpack:"s"`
+	R bool      `json:"r" msgpack:"r"`
+	T OrderKind `json:"t" msgpack:"t"`
+	C string    `json:"c,omitempty" msgpack:"c,omitempty"` // optional client order id
+}
+
+type OrderMessage struct {
+	Type     string             `json:"type" msgpack:"type"`
+	Orders   []OrderHyperliquid `json:"orders" msgpack:"orders"`
+	Grouping string             `json:"grouping" msgpack:"grouping"`
+	Builder  *Builder           `json:"builder" msgpack:"builder,omitempty"`
+}
+
+type Builder struct {
+	B string `json:"b" msgpack:"b"`
+	F int    `json:"f" msgpack:"f"`
+}
+
+// cancel
+// {"type":"cancel","cancels":[{"a":10000,"o":9078231563}]}
+type Cancel struct {
+	A int `json:"a" msgpack:"a"`
+	O int `json:"o" msgpack:"o"`
+}
+type CancelMessage struct {
+	Type    string   `json:"type" msgpack:"type"`
+	Cancels []Cancel `json:"cancels" msgpack:"cancels"`
+	F       *bool    `json:"f,omitempty" msgpack:"f,omitempty"` // optional fast flag, must be absent when false
+}
+
+// Transfer
+// {"hyperliquidChain":"Mainnet","signatureChainId":"0x66eee","type":"usdClassTransfer","amount":"100000","toPerp":false,"nonce":1737458035944}
+type TransferMessage struct {
+	HyperliquidChain string `json:"hyperliquidChain" msgpack:"hyperliquidChain"`
+	SignatureChainID string `json:"signatureChainId" msgpack:"signatureChainId"`
+	Type             string `json:"type" msgpack:"type"`
+	Amount           string `json:"amount" msgpack:"amount"`
+	ToPerp           bool   `json:"toPerp" msgpack:"toPerp"`
+	Nonce            int64  `json:"nonce" msgpack:"nonce"`
+}
+type SubAccountTransferMessage struct {
+	Type           string `json:"type" msgpack:"type"`
+	SubAccountUser string `json:"subAccountUser" msgpack:"subAccountUser"`
+	IsDeposit      bool   `json:"isDeposit" msgpack:"isDeposit"`
+	Usd            int    `json:"usd" msgpack:"usd"`
+}
+
+// Vault transfer message
+
+type VaultTransferMessage struct {
+	Type         string `json:"type" msgpack:"type"`
+	VaultAddress string `json:"vaultAddress" msgpack:"vaultAddress"`
+	IsDeposit    bool   `json:"isDeposit" msgpack:"isDeposit"`
+	Usd          int    `json:"usd" msgpack:"usd"`
+}
+
+// withdraw
+// {"hyperliquidChain":"Mainnet","signatureChainId":"0x66eee","destination":"0xc950889d14a3717f541ec246bc253d7a9e98c78f","amount":"100000","time":1737458231937,"type":"withdraw3"}
+type WithdrawMessage struct {
+	HyperliquidChain string `json:"hyperliquidChain" msgpack:"hyperliquidChain"`
+	SignatureChainID string `json:"signatureChainId" msgpack:"signatureChainId"`
+	Destination      string `json:"destination" msgpack:"destination"`
+	Amount           string `json:"amount" msgpack:"amount"`
+	Time             int64  `json:"time" msgpack:"time"`
+	Type             string `json:"type" msgpack:"type"`
+}
+
+// editOrder
+// {"type":"batchModify","modifies":[{"oid":8553833906,"order":{"a":5,"b":true,"p":"151","s":"0.2","r":false,"t":{"limit":{"tif":"Gtc"}}}}]}
+type Modify struct {
+	OID   int              `json:"oid" msgpack:"oid"`
+	Order OrderHyperliquid `json:"order" msgpack:"order"`
+}
+
+// EditOrderMessage represents the batch modification message.
+type EditOrderMessage struct {
+	Type     string   `json:"type" msgpack:"type"`
+	Modifies []Modify `json:"modifies" msgpack:"modifies"`
+}
+
+// CreateSubAccount message
+
+type CreateSubAccountMessage struct {
+	Type string `json:"type" msgpack:"type"`
+	Name string `json:"name" msgpack:"name"`
+}
+
+// UpdateLeverage message
+
+type UpdateLeverageMessage struct {
+	Type     string `json:"type" msgpack:"type"`
+	Asset    int    `json:"asset" msgpack:"asset"`
+	IsCross  bool   `json:"isCross" msgpack:"isCross"`
+	Leverage int    `json:"leverage" msgpack:"leverage"`
+}
+
+// UpdateIsolatedMargin message
+
+type UpdateIsolatedMarginMessage struct {
+	Type  string `json:"type" msgpack:"type"`
+	Asset int    `json:"asset" msgpack:"asset"`
+	IsBuy bool   `json:"isBuy" msgpack:"isBuy"`
+	Ntli  int    `json:"Ntli" msgpack:"Ntli"`
+}
+
+type ReserveRequestWeightMessage struct {
+	Type   string `json:"type" msgpack:"type"`
+	Weight int    `json:"weight" msgpack:"weight"`
+}
+
+// SetReferrer message
+
+type SetReferrerMessage struct {
+	Type string `json:"type" msgpack:"type"`
+	Code string `json:"code" msgpack:"code"`
+}
+
+// AgentSetAbstraction message
+
+type AgentSetAbstractionMessage struct {
+	Type        string `json:"type" msgpack:"type"`
+	Abstraction string `json:"abstraction" msgpack:"abstraction"`
+}
+
+// TwapOrder message
+
+type TwapOrderSpec struct {
+	A int    `json:"a" msgpack:"a"`
+	B bool   `json:"b" msgpack:"b"`
+	S string `json:"s" msgpack:"s"`
+	R bool   `json:"r" msgpack:"r"`
+	M int    `json:"m" msgpack:"m"`
+	T bool   `json:"t" msgpack:"t"`
+}
+
+type TwapOrderMessage struct {
+	Type string        `json:"type" msgpack:"type"`
+	Twap TwapOrderSpec `json:"twap" msgpack:"twap"`
+}
+
+// TwapCancel message
+
+type TwapCancelMessage struct {
+	Type string `json:"type" msgpack:"type"`
+	A    int    `json:"a" msgpack:"a"`
+	T    int    `json:"t" msgpack:"t"`
+}
+
+// ScheduleCancel message
+
+type ScheduleCancelMessage struct {
+	Type string `json:"type" msgpack:"type"`
+	Time int    `json:"time" msgpack:"time"`
+}
+
+// CreateVault message
+
+type CreateVaultMessage struct {
+	Type        string `json:"type" msgpack:"type"`
+	Name        string `json:"name" msgpack:"name"`
+	Description string `json:"description" msgpack:"description"`
+	InitialUsd  int    `json:"initialUsd" msgpack:"initialUsd"`
+	Nonce       int    `json:"nonce" msgpack:"nonce"`
+}
+
+// SubAccountSpotTransfer message
+
+type SubAccountSpotTransferMessage struct {
+	Type           string `json:"type" msgpack:"type"`
+	SubAccountUser string `json:"subAccountUser" msgpack:"subAccountUser"`
+	IsDeposit      bool   `json:"isDeposit" msgpack:"isDeposit"`
+	Token          string `json:"token" msgpack:"token"`
+	Amount         string `json:"amount" msgpack:"amount"`
+}
+
+// CancelByCloid message
+
+type CancelByCloidItem struct {
+	Asset int    `json:"asset" msgpack:"asset"`
+	Cloid string `json:"cloid" msgpack:"cloid"`
+}
+
+type CancelByCloidMessage struct {
+	Type    string              `json:"type" msgpack:"type"`
+	Cancels []CancelByCloidItem `json:"cancels" msgpack:"cancels"`
+	F       *bool               `json:"f,omitempty" msgpack:"f,omitempty"` // optional fast flag, must be absent when false
+}
+
+// =====================================  Hyperliquid Structs ===================================== //
+
+func ethEncodeStructuredData(primaryType string, domain apitypes.TypedDataDomain, messageTypes map[string][]apitypes.Type, messageData map[string]any) (string, error) {
+	// domain {"chainId":1337,"name":"Exchange","verifyingContract":"0x0000000000000000000000000000000000000000","version":"1"}
+	// agent: {"Agent":[{"name":"source","type":"string"},{"name":"connectionId","type":"bytes32"}]}
+	// phantom: {"source":"a","connectionId":{"0":81,"1":132,"2":60,"3":100,"4":202,"5":146,"6":114,"7":128,"8":99,"9":200,"10":106,"11":37,"12":220,"13":61,"14":150,"15":236,"16":173,"17":119,"18":83,"19":11,"20":205,"21":91,"22":222,"23":149,"24":201,"25":182,"26":71,"27":103,"28":74,"29":0,"30":223,"31":202}}
+
+	var domainTypesList []apitypes.Type = []apitypes.Type{
+		{Name: "name", Type: "string"},
+		{Name: "version", Type: "string"},
+		{Name: "chainId", Type: "uint256"},
+		{Name: "verifyingContract", Type: "address"},
+		// {Name: "salt", Type: "bytes32"},
+	}
+
+	messageTypes["EIP712Domain"] = domainTypesList
+
+	typedData := apitypes.TypedData{
+		Domain:      domain,
+		Types:       messageTypes,
+		PrimaryType: primaryType, // Set this to the primary type used in the message
+		Message:     messageData,
+	}
+
+	encodedDomain, err := typedData.HashStruct("EIP712Domain", domain.Map())
+	if err != nil {
+		return "", err
+	}
+
+	encodedData, err := typedData.HashStruct(typedData.PrimaryType, typedData.Message)
+	if err != nil {
+		return "", err
+	}
+
+	domainHex := hexutil.Encode(encodedDomain) // comes with 0x, remove
+	domainHex = strings.TrimPrefix(domainHex, "0x")
+	dataHex := hexutil.Encode(encodedData)
+	dataHex = strings.TrimPrefix(dataHex, "0x")
+
+	encodedHex := "1901" + domainHex + dataHex
+	return encodedHex, nil
+}
+
+func (this *BaseExchange) EthEncodeStructuredData(domain2 any, messageTypes2 any, messageData2 any) []uint8 {
+
+	useDynamicStruct := true // Set to false for hardcoded struct-based approach
+	if useDynamicStruct {
+		return this.EthEncodeStructuredDataDynamically(domain2, messageTypes2, messageData2)
+	}
+
+	// Legacy struct-based approach
+
+	// domain {"chainId":1337,"name":"Exchange","verifyingContract":"0x0000000000000000000000000000000000000000","version":"1"}
+	// agent: {"Agent":[{"name":"source","type":"string"},{"name":"connectionId","type":"bytes32"}]}
+	// phantom: {"source":"a","connectionId":{"0":81,"1":132,"2":60,"3":100,"4":202,"5":146,"6":114,"7":128,"8":99,"9":200,"10":106,"11":37,"12":220,"13":61,"14":150,"15":236,"16":173,"17":119,"18":83,"19":11,"20":205,"21":91,"22":222,"23":149,"24":201,"25":182,"26":71,"27":103,"28":74,"29":0,"30":223,"31":202}}
+	if this.Id != "hyperliquid" {
+		return []uint8{}
+	}
+	domain := domain2.(map[string]any)
+	messageTypes := messageTypes2.(map[string]any)
+	messageData := messageData2.(map[string]any)
+
+	val, ok := messageData["nonce"]
+	if ok {
+		// messageData["nonce"] = uint64(val.(int64))
+		messageData["nonce"] = (*math.HexOrDecimal256)(big.NewInt(derefScalar(val).(int64)))
+	}
+
+	val, ok = messageData["time"]
+	if ok {
+		// messageData["time"] = uint64(val.(int64))
+		messageData["time"] = (*math.HexOrDecimal256)(big.NewInt(derefScalar(val).(int64)))
+	}
+
+	domainTyped := apitypes.TypedDataDomain{
+		Name:              SafeString(domain, "name", "").(string),
+		Version:           SafeString(domain, "version", "").(string),
+		ChainId:           (*math.HexOrDecimal256)(big.NewInt(SafeInteger(domain, "chainId", int64(0)).(int64))),
+		VerifyingContract: SafeString(domain, "verifyingContract", "").(string),
+	}
+
+	messageTypesTyped := map[string][]apitypes.Type{}
+
+	primaryType := "" // check this what is the primary type
+	for key, value := range messageTypes {
+		primaryType = key
+		types := value.([]any)
+		messageTypesTyped[key] = make([]apitypes.Type, len(types))
+		for i, type_ := range types {
+			typeMap := type_.(map[string]any)
+			messageTypesTyped[key][i] = apitypes.Type{
+				Name: derefScalar(typeMap["name"]).(string),
+				Type: derefScalar(typeMap["type"]).(string),
+			}
+		}
+	}
+
+	hexData, err := ethEncodeStructuredData(primaryType, domainTyped, messageTypesTyped, messageData)
+	if err != nil {
+		// log.Fatalf("Error encoding data: %v", err)
+		str, _ := fmt.Printf("Binary Data: %x\n", hexData)
+		panic(str)
+	}
+	return this.Base16ToBinary(hexData)
+}
+
+func (this *BaseExchange) EthEncodeStructuredDataDynamically(domain2 any, messageTypes2 any, messageData2 any) []uint8 {
+	domain := domain2.(map[string]any)
+	messageTypes := messageTypes2.(map[string]any)
+	messageData := messageData2.(map[string]any)
+
+	td, err := BuildTypedDataFromJS("", domain, messageTypes, messageData)
+	if err != nil {
+		panic(fmt.Sprintf("Error building typed data: %v", err))
+	}
+	digest, err := this.EncodeTypedData(td)
+	if err != nil {
+		panic(fmt.Sprintf("Error computing digest: %v", err))
+	}
+
+	hexData := hexutil.Encode(digest[:])
+	hexData = strings.TrimPrefix(hexData, "0x")
+	return this.Base16ToBinary(hexData)
+}
+
+func (this *BaseExchange) EthAbiEncode(types2 any, args2 any) any {
+	typesList, ok1 := types2.([]any)
+	argsList, ok2 := args2.([]any)
+	if !ok1 || !ok2 || len(typesList) != len(argsList) {
+		return []uint8{}
+	}
+	result := []byte{}
+	for i := 0; i < len(typesList); i++ {
+		typeStr, _ := typesList[i].(string)
+		result = append(result, ethAbiEncodeWord(typeStr, argsList[i])...)
+	}
+	return result
+}
+
+// ethAbiEncodeWord encodes a single static ABI value into its 32-byte word. It covers the
+// static types EIP-712 signers use (uintN, intN, address, bytesN, bool); the ABI head encoding
+// of static types is simply each value padded to 32 bytes, so no dynamic-type support is needed.
+func ethAbiEncodeWord(typeStr string, value any) []byte {
+	// a Safe*-carried pointer must encode as the value it points at, not fall
+	// through every type switch below and encode as a zero word
+	value = derefScalar(value)
+	word := make([]byte, 32)
+	if typeStr == "address" {
+		s, _ := value.(string)
+		addr := common.HexToAddress(s)
+		copy(word[12:], addr.Bytes()) // addresses are right-aligned
+		return word
+	}
+	if strings.HasPrefix(typeStr, "bytes") {
+		var b []byte
+		switch v := value.(type) {
+		case []byte:
+			b = v
+		case string:
+			b = common.FromHex(v)
+		}
+		copy(word, b) // fixed bytesN are left-aligned (zero-padded on the right)
+		return word
+	}
+	if typeStr == "bool" {
+		if v, ok := value.(bool); ok && v {
+			word[31] = 1
+		}
+		return word
+	}
+	if strings.HasPrefix(typeStr, "uint") || strings.HasPrefix(typeStr, "int") {
+		bi := ethAbiToBigInt(value)
+		if bi.Sign() < 0 {
+			mod := new(big.Int).Lsh(big.NewInt(1), 256)
+			bi = new(big.Int).Add(mod, bi) // two's complement for signed ints
+		}
+		biBytes := bi.Bytes()
+		if len(biBytes) > 32 {
+			biBytes = biBytes[len(biBytes)-32:]
+		}
+		copy(word[32-len(biBytes):], biBytes) // integers are right-aligned
+		return word
+	}
+	return word
+}
+
+func ethAbiToBigInt(value any) *big.Int {
+	switch v := value.(type) {
+	case string:
+		bi := new(big.Int)
+		bi.SetString(v, 10)
+		return bi
+	case *big.Int:
+		return v
+	case int:
+		return big.NewInt(int64(v))
+	case int64:
+		return big.NewInt(v)
+	case float64:
+		return big.NewInt(int64(v))
+	}
+	return big.NewInt(0)
+}
+
+func ConvertInt64ToBigInt(data any) any { // these functions change in place the object, no bueno
+	switch v := data.(type) {
+	case map[string]any:
+		for key, value := range v {
+			v[key] = ConvertInt64ToBigInt(value)
+		}
+		return v
+	case []any:
+		for i, item := range v {
+			v[i] = ConvertInt64ToBigInt(item)
+		}
+		return v
+	case int64:
+		// return uint8(v)
+		return int(v)
+	default:
+		return v // Leave other types unchanged
+	}
+
+}
+
+func DeepExtend(objs ...any) map[string]any { //tmp duplicated implementation
+	var outObj any
+	for _, x := range objs {
+		if x == nil {
+			continue
+		}
+		if reflect.TypeOf(x).Kind() == reflect.Map {
+			if outObj == nil || reflect.TypeOf(outObj).Kind() != reflect.Map {
+				outObj = make(map[string]any)
+			}
+			dictX := x.(map[string]any)
+			for k := range dictX {
+				arg1 := outObj.(map[string]any)[k]
+				arg2 := dictX[k]
+				if arg1 != nil && arg2 != nil && reflect.TypeOf(arg1).Kind() == reflect.Map && reflect.TypeOf(arg2).Kind() == reflect.Map {
+					outObj.(map[string]any)[k] = DeepExtend(arg1, arg2)
+				} else {
+					if arg2 != nil {
+						outObj.(map[string]any)[k] = arg2
+					} else {
+						outObj.(map[string]any)[k] = arg1
+					}
+				}
+			}
+		} else {
+			outObj = x
+		}
+	}
+	return outObj.(map[string]any)
+}
+
+func ConvertInt64ToInt(data any) any { // these functions change in place the object, no bueno
+	switch v := data.(type) {
+	case map[string]any:
+		for key, value := range v {
+			v[key] = ConvertInt64ToInt(value)
+		}
+		return v
+	case []any:
+		for i, item := range v {
+			v[i] = ConvertInt64ToInt(item)
+		}
+		return v
+	case int64:
+		return int(v)
+	default:
+		return v // Leave other types unchanged
+	}
+}
+
+func decodeHyperliquidMessage(input any, output any) error {
+	raw, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(raw, output)
+}
+
+func (this *BaseExchange) Packb(data any) []uint8 {
+
+	var dataObj any = nil
+	dataJson := this.Json(data)
+	dataObj = this.ParseJson(dataJson)
+
+	// if subDict, ok := data.(map[string]any); ok {
+	// 	dataObj = DeepExtend(subDict, map[string]any{}) // create a new only to avoid changing the original
+	// } else {
+	// 	dataObj = data
+	// }
+	converted := ConvertInt64ToBigInt(dataObj)
+
+	if this.Id != "hyperliquid" {
+		p, err := msgpack.Marshal(converted)
+		if err != nil {
+			panic(err)
+		}
+		return p
+	}
+
+	typeA := SafeString(converted, "type", "").(string)
+
+	switch typeA {
+	case "order":
+		var orderMsg OrderMessage
+
+		err := decodeHyperliquidMessage(converted, &orderMsg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(orderMsg)
+
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "cancel":
+		var cancelMsg CancelMessage
+
+		err := decodeHyperliquidMessage(converted, &cancelMsg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(cancelMsg)
+
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "withdraw3":
+		var withdrawMsg WithdrawMessage
+
+		err := decodeHyperliquidMessage(converted, &withdrawMsg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(withdrawMsg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "batchModify":
+		var editMsg EditOrderMessage
+
+		err := decodeHyperliquidMessage(converted, &editMsg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(editMsg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "subAccountTransfer":
+		var subAccountTransferMsg SubAccountTransferMessage
+
+		err := decodeHyperliquidMessage(converted, &subAccountTransferMsg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(subAccountTransferMsg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "createSubAccount":
+		var createSubAccountMsg CreateSubAccountMessage
+
+		err := decodeHyperliquidMessage(converted, &createSubAccountMsg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(createSubAccountMsg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "updateLeverage":
+		var leverageMsg UpdateLeverageMessage
+
+		err := decodeHyperliquidMessage(converted, &leverageMsg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(leverageMsg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "updateIsolatedMargin":
+		var isolatedMarginMsg UpdateIsolatedMarginMessage
+
+		err := decodeHyperliquidMessage(converted, &isolatedMarginMsg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(isolatedMarginMsg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "vaultTransfer":
+		var vaultTransferMsg VaultTransferMessage
+
+		err := decodeHyperliquidMessage(converted, &vaultTransferMsg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(vaultTransferMsg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "reserveRequestWeight":
+		var reserveRequestWeightMsg ReserveRequestWeightMessage
+
+		err := decodeHyperliquidMessage(converted, &reserveRequestWeightMsg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(reserveRequestWeightMsg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "setReferrer":
+		var msg SetReferrerMessage
+
+		err := decodeHyperliquidMessage(converted, &msg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(msg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "agentSetAbstraction":
+		var msg AgentSetAbstractionMessage
+
+		err := decodeHyperliquidMessage(converted, &msg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(msg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "twapOrder":
+		var msg TwapOrderMessage
+
+		err := decodeHyperliquidMessage(converted, &msg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(msg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "twapCancel":
+		var msg TwapCancelMessage
+
+		err := decodeHyperliquidMessage(converted, &msg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(msg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "scheduleCancel":
+		var msg ScheduleCancelMessage
+
+		err := decodeHyperliquidMessage(converted, &msg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(msg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "createVault":
+		var msg CreateVaultMessage
+
+		err := decodeHyperliquidMessage(converted, &msg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(msg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "subAccountSpotTransfer":
+		var msg SubAccountSpotTransferMessage
+
+		err := decodeHyperliquidMessage(converted, &msg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(msg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	case "cancelByCloid":
+		var msg CancelByCloidMessage
+
+		err := decodeHyperliquidMessage(converted, &msg)
+		if err != nil {
+			panic(err)
+		}
+
+		packed, err := msgpack.Marshal(msg)
+		if err != nil {
+			panic(err)
+		}
+		return packed
+	}
+	return nil
+}
+
+func SafeInt(v any) int64 {
+	switch val := v.(type) {
+	case int64:
+		return val
+	case float64:
+		return int64(val)
+	case int:
+		return int64(val)
+	case uint32:
+		return int64(val)
+	case uint8:
+		return int64(val)
+	case *int64:
+		if val == nil {
+			return 0
+		}
+		return *val
+	case string:
+		i, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			f, errFloat := strconv.ParseFloat(val, 64)
+			if errFloat != nil {
+				panic(fmt.Sprintf("SafeInt: cannot parse string '%s'", val))
+			}
+			return int64(f)
+		}
+		return i
+	default:
+		panic(fmt.Sprintf("SafeInt: unsupported type %T, value: %v", v, v))
+	}
+}
+
+// it's necessary to load lighter library in python
+// we create client with the given api credential in this function
+func (this *BaseExchange) LoadLighterLibraryAsync(path any, chainId any, privateKey any, apiKeyIndex any, accountIndex any, createClient bool) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any])
+	go func() {
+		ch <- AsyncResult[any]{Value: this.loadLighterLibraryHelper(derefScalar(path).(string), uint32(SafeInt(chainId)), derefScalar(privateKey).(string), uint8(SafeInt(apiKeyIndex)), int64(SafeInt(accountIndex)), createClient)}
+	}()
+	return ch
+}
+
+func (this *BaseExchange) loadLighterLibraryHelper(path string, chainId uint32, privateKey string, apiKeyIndex uint8, accountIndex int64, createClient bool) any {
+	if createClient {
+		txClient := this.lighterCreateClient(nil, chainId, privateKey, apiKeyIndex, accountIndex)
+		return txClient
+	}
+	return nil
+}
+
+func (this *BaseExchange) LighterCreateClient(signer any, chainId any, privateKey any, apiKeyIndex any, accountIndex any) any {
+	return this.lighterCreateClient(signer, uint32(SafeInt(chainId)), derefScalar(privateKey).(string), uint8(SafeInt(apiKeyIndex)), int64(SafeInt(accountIndex)))
+}
+
+func (this *BaseExchange) lighterCreateClient(signer any, chainId uint32, privateKey string, apiKeyIndex uint8, accountIndex int64) any {
+	url := this.ImplodeHostname(this.UrlsApi["public"])
+
+	httpClient := http.NewClient(url)
+
+	txClient, err := client.CreateClient(httpClient, privateKey, chainId, apiKeyIndex, accountIndex)
+	if err != nil {
+		panic(err)
+	}
+	return txClient
+}
+
+// safeIntOr mirrors safeInteger(request, key, default) used by the other
+// language bindings: a key that is absent (builderFee disabled) yields the
+// default instead of panicking in SafeInt.
+func safeIntOr(v any, defaultValue int64) int64 {
+	if v == nil {
+		return defaultValue
+	}
+	return SafeInt(v)
+}
+
+func (this *BaseExchange) lighterL2TxAttr(integratorAccountIndex int64, integratorTakerFee uint32, integratorMakerFee uint32, skipNonce uint8) types.L2TxAttributes {
+	l2TxAttr := types.L2TxAttributes{}
+	if integratorAccountIndex > 0 && integratorTakerFee > 0 && integratorMakerFee > 0 {
+		l2TxAttr.IntegratorAccountIndex = &integratorAccountIndex
+		l2TxAttr.IntegratorTakerFee = &integratorTakerFee
+		l2TxAttr.IntegratorMakerFee = &integratorMakerFee
+	}
+	if skipNonce == 1 {
+		l2TxAttr.SkipNonce = &skipNonce
+	}
+	return l2TxAttr
+}
+
+func (this *BaseExchange) LighterSignCreateGroupedOrders(signer any, request any) any {
+	return this.lighterSignCreateGroupedOrders(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignCreateGroupedOrders(signer *client.TxClient, request map[string]any) any {
+	ordersRaw, ok := request["orders"]
+	if !ok {
+		panic("Missing 'orders' in request")
+	}
+
+	orders, ok := ordersRaw.([]any)
+	if !ok {
+		panic(fmt.Sprintf("'orders' must be an array, got %T", ordersRaw))
+	}
+
+	length := len(orders)
+	ordersArr := make([]*types.CreateOrderTxReq, length)
+
+	for i, item := range orders {
+		orderMap, ok := item.(map[string]any)
+		if !ok {
+			panic(fmt.Sprintf("Order %d is not a map[string]any", i))
+		}
+
+		orderExpiry := int64(SafeInt(orderMap["order_expiry"]))
+		if orderExpiry == -1 {
+			orderExpiry = time.Now().Add(time.Hour * 24 * 28).UnixMilli() // 28 days
+		}
+
+		ordersArr[i] = &types.CreateOrderTxReq{
+			MarketIndex:      int16(SafeInt(orderMap["market_index"])),
+			ClientOrderIndex: int64(SafeInt(orderMap["client_order_index"])),
+			BaseAmount:       int64(SafeInt(orderMap["base_amount"])),
+			Price:            uint32(SafeInt(orderMap["avg_execution_price"])),
+			IsAsk:            uint8(SafeInt(orderMap["is_ask"])),
+			Type:             uint8(SafeInt(orderMap["order_type"])),
+			TimeInForce:      uint8(SafeInt(orderMap["time_in_force"])),
+			ReduceOnly:       uint8(SafeInt(orderMap["reduce_only"])),
+			TriggerPrice:     uint32(SafeInt(orderMap["trigger_price"])),
+			OrderExpiry:      orderExpiry,
+		}
+	}
+
+	tx := &types.CreateGroupedOrdersTxReq{
+		GroupingType: uint8(SafeInt(request["grouping_type"])),
+		Orders:       ordersArr,
+	}
+
+	nonce := safeIntOr(request["nonce"], 0)
+	l2TxAttr := this.lighterL2TxAttr(safeIntOr(request["integrator_account_index"], 0), uint32(safeIntOr(request["integrator_taker_fee"], 0)), uint32(safeIntOr(request["integrator_maker_fee"], 0)), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetCreateGroupedOrdersTransaction(tx, ops)
+	if err != nil {
+		panic(err)
+	}
+
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+
+	return res
+}
+
+func (this *BaseExchange) LighterSignCreateOrder(signer any, request any) any {
+	return this.lighterSignCreateOrder(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignCreateOrder(signer *client.TxClient, request map[string]any) any {
+	orderExpiry := int64(SafeInt(request["order_expiry"]))
+	if orderExpiry == -1 {
+		orderExpiry = time.Now().Add(time.Hour * 24 * 28).UnixMilli() // 28 days
+	}
+
+	tx := &types.CreateOrderTxReq{
+		MarketIndex:      int16(SafeInt(request["market_index"])),
+		ClientOrderIndex: int64(SafeInt(request["client_order_index"])),
+		BaseAmount:       int64(SafeInt(request["base_amount"])),
+		Price:            uint32(SafeInt(request["avg_execution_price"])),
+		IsAsk:            uint8(SafeInt(request["is_ask"])),
+		Type:             uint8(SafeInt(request["order_type"])),
+		TimeInForce:      uint8(SafeInt(request["time_in_force"])),
+		ReduceOnly:       uint8(SafeInt(request["reduce_only"])),
+		TriggerPrice:     uint32(SafeInt(request["trigger_price"])),
+		OrderExpiry:      orderExpiry,
+	}
+	nonce := safeIntOr(request["nonce"], 0)
+	l2TxAttr := this.lighterL2TxAttr(safeIntOr(request["integrator_account_index"], 0), uint32(safeIntOr(request["integrator_taker_fee"], 0)), uint32(safeIntOr(request["integrator_maker_fee"], 0)), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetCreateOrderTransaction(tx, ops)
+	if err != nil {
+		panic(err)
+	}
+
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+
+	return res
+}
+
+func (this *BaseExchange) LighterSignCancelOrder(signer any, request any) any {
+	return this.lighterSignCancelOrder(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignCancelOrder(signer *client.TxClient, request map[string]any) any {
+	tx := &types.CancelOrderTxReq{
+		MarketIndex: int16(SafeInt(request["market_index"])),
+		Index:       int64(SafeInt(request["order_index"])),
+	}
+	nonce := int64(SafeInt(request["nonce"]))
+	l2TxAttr := this.lighterL2TxAttr(0, uint32(0), uint32(0), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetCancelOrderTransaction(tx, ops)
+	if err != nil {
+		panic(err)
+	}
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+	return res
+}
+
+func (this *BaseExchange) LighterSignWithdraw(signer any, request any) any {
+	return this.lighterSignWithdraw(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignWithdraw(signer *client.TxClient, request map[string]any) any {
+	tx := &types.WithdrawTxReq{
+		AssetIndex: int16(SafeInt(request["asset_index"])),
+		RouteType:  uint8(SafeInt(request["route_type"])),
+		Amount:     uint64(SafeInt(request["amount"])),
+	}
+	nonce := int64(SafeInt(request["nonce"]))
+	l2TxAttr := this.lighterL2TxAttr(0, uint32(0), uint32(0), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetWithdrawTransaction(tx, ops)
+	if err != nil {
+		panic(err)
+	}
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+	return res
+}
+
+func (this *BaseExchange) LighterSignCreateSubAccount(signer any, request any) any {
+	return this.lighterSignCreateSubAccount(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignCreateSubAccount(signer *client.TxClient, request map[string]any) any {
+	nonce := int64(SafeInt(request["nonce"]))
+	l2TxAttr := this.lighterL2TxAttr(0, uint32(0), uint32(0), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetCreateSubAccountTransaction(ops)
+	if err != nil {
+		panic(err)
+	}
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+	return res
+}
+
+func (this *BaseExchange) LighterSignCancelAllOrders(signer any, request any) any {
+	return this.lighterSignCancelAllOrders(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignCancelAllOrders(signer *client.TxClient, request map[string]any) any {
+	tx := &types.CancelAllOrdersTxReq{
+		TimeInForce: uint8(SafeInt(request["time_in_force"])),
+		Time:        int64(SafeInt(request["time"])),
+	}
+	nonce := int64(SafeInt(request["nonce"]))
+	l2TxAttr := this.lighterL2TxAttr(0, uint32(0), uint32(0), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetCancelAllOrdersTransaction(tx, ops)
+	if err != nil {
+		panic(err)
+	}
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+	return res
+}
+
+func (this *BaseExchange) LighterSignModifyOrder(signer any, request any) any {
+	return this.lighterSignModifyOrder(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignModifyOrder(signer *client.TxClient, request map[string]any) any {
+	tx := &types.ModifyOrderTxReq{
+		MarketIndex:  int16(SafeInt(request["market_index"])),
+		Index:        int64(SafeInt(request["index"])),
+		BaseAmount:   int64(SafeInt(request["base_amount"])),
+		Price:        uint32(SafeInt(request["price"])),
+		TriggerPrice: uint32(SafeInt(request["trigger_price"])),
+	}
+	nonce := int64(SafeInt(request["nonce"]))
+	l2TxAttr := this.lighterL2TxAttr(0, uint32(0), uint32(0), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetModifyOrderTransaction(tx, ops)
+	if err != nil {
+		panic(err)
+	}
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+	return res
+}
+
+func (this *BaseExchange) LighterSignTransfer(signer any, request any) any {
+	return this.lighterSignTransfer(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignTransfer(signer *client.TxClient, request map[string]any) any {
+	var memoArr [32]byte
+	bs := []byte(derefScalar(request["memo"]).(string))
+	if len(bs) != 32 {
+		panic(fmt.Errorf("memo expected to be 32 bytes long"))
+	}
+	for i := 0; i < 32; i++ {
+		memoArr[i] = bs[i]
+	}
+	tx := &types.TransferTxReq{
+		ToAccountIndex: int64(SafeInt(request["to_account_index"])),
+		AssetIndex:     int16(SafeInt(request["asset_index"])),
+		FromRouteType:  uint8(SafeInt(request["from_route_type"])),
+		ToRouteType:    uint8(SafeInt(request["to_route_type"])),
+		Amount:         int64(SafeInt(request["amount"])),
+		USDCFee:        int64(SafeInt(request["usdc_fee"])),
+		Memo:           memoArr,
+	}
+	nonce := int64(SafeInt(request["nonce"]))
+	l2TxAttr := this.lighterL2TxAttr(0, uint32(0), uint32(0), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetTransferTransaction(tx, ops)
+	if err != nil {
+		panic(err)
+	}
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+	return res
+}
+
+func (this *BaseExchange) LighterSignUpdateLeverage(signer any, request any) any {
+	return this.lighterSignUpdateLeverage(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignUpdateLeverage(signer *client.TxClient, request map[string]any) any {
+	tx := &types.UpdateLeverageTxReq{
+		MarketIndex:           int16(SafeInt(request["market_index"])),
+		InitialMarginFraction: uint16(SafeInt(request["initial_margin_fraction"])),
+		MarginMode:            uint8(SafeInt(request["margin_mode"])),
+	}
+	nonce := int64(SafeInt(request["nonce"]))
+	l2TxAttr := this.lighterL2TxAttr(0, uint32(0), uint32(0), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetUpdateLeverageTransaction(tx, ops)
+	if err != nil {
+		panic(err)
+	}
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+	return res
+}
+
+func (this *BaseExchange) LighterCreateAuthToken(signer any, request any) any {
+	return this.lighterCreateAuthToken(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterCreateAuthToken(signer *client.TxClient, request map[string]any) any {
+	deadline := time.Unix(int64(SafeInt(request["deadline"])), 0)
+
+	auth, err := signer.GetAuthToken(deadline)
+	if err != nil {
+		panic(err)
+	}
+
+	return auth
+}
+
+func (this *BaseExchange) LighterSignUpdateMargin(signer any, request any) any {
+	return this.lighterSignUpdateMargin(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignUpdateMargin(signer *client.TxClient, request map[string]any) any {
+	tx := &types.UpdateMarginTxReq{
+		MarketIndex: int16(SafeInt(request["market_index"])),
+		USDCAmount:  int64(SafeInt(request["usdc_amount"])),
+		Direction:   uint8(SafeInt(request["direction"])),
+	}
+	nonce := int64(SafeInt(request["nonce"]))
+	l2TxAttr := this.lighterL2TxAttr(0, uint32(0), uint32(0), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetUpdateMarginTransaction(tx, ops)
+	if err != nil {
+		panic(err)
+	}
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+	return res
+}
+
+func (this *BaseExchange) LighterSignApproveIntegrator(signer any, request any) any {
+	return this.lighterSignApproveIntegrator(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignApproveIntegrator(signer *client.TxClient, request map[string]any) any {
+	tx := &types.ApproveIntegratorTxReq{
+		IntegratorAccountIndex: int64(SafeInt(request["integrator_account_index"])),
+		MaxPerpsTakerFee:       uint32(SafeInt(request["integrator_taker_fee"])),
+		MaxPerpsMakerFee:       uint32(SafeInt(request["integrator_maker_fee"])),
+		MaxSpotTakerFee:        uint32(SafeInt(request["integrator_taker_fee"])),
+		MaxSpotMakerFee:        uint32(SafeInt(request["integrator_maker_fee"])),
+		ApprovalExpiry:         int64(SafeInt(request["approval_expiry"])),
+	}
+	nonce := int64(SafeInt(request["nonce"]))
+	l2TxAttr := this.lighterL2TxAttr(0, uint32(0), uint32(0), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetApproveIntegratorTx(tx, ops)
+	if err != nil {
+		panic(err)
+	}
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+	res = append(res, txInfo.GetL1SignatureBody(signer.GetChainId()))
+	return res
+}
+
+func (this *BaseExchange) LighterGenerateApiKey(signer any) any {
+	privateKey, publicKey, _ := client.GenerateAPIKey()
+	res := make([]any, 0)
+	res = append(res, privateKey)
+	res = append(res, publicKey)
+	return res
+}
+
+func (this *BaseExchange) LighterSignChangePubkey(signer any, request any) any {
+	return this.lighterSignChangePubkey(signer.(*client.TxClient), request.(map[string]any))
+}
+
+func (this *BaseExchange) lighterSignChangePubkey(signer *client.TxClient, request map[string]any) any {
+	decPubkey, err := hexutil.Decode(derefScalar(request["pubkey"]).(string))
+	if err != nil {
+		panic(err)
+	}
+	var pubkeyBytes [40]byte
+	copy(pubkeyBytes[:], decPubkey)
+	tx := &types.ChangePubKeyReq{
+		PubKey: pubkeyBytes,
+	}
+	nonce := int64(SafeInt(request["nonce"]))
+	l2TxAttr := this.lighterL2TxAttr(0, uint32(0), uint32(0), uint8(1))
+	ops := &types.TransactOpts{
+		Nonce:        &nonce,
+		TxAttributes: &l2TxAttr,
+	}
+
+	txInfo, err := signer.GetChangePubKeyTransaction(tx, ops)
+	if err != nil {
+		panic(err)
+	}
+	txInfoStr, err := txInfo.GetTxInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	res := make([]any, 0)
+	res = append(res, txInfo.GetTxType())
+	res = append(res, txInfoStr)
+	res = append(res, txInfo.GetL1SignatureBody())
+	return res
+}
+
+func (this *BaseExchange) EthGetAddressFromPrivateKey(privateKey any) string {
+	// Convert any to string
+	privateKeyStr, ok := privateKey.(string)
+	if !ok {
+		panic("privateKey must be a string")
+	}
+
+	// Remove "0x" prefix if present
+	cleanPrivateKey := strings.TrimPrefix(privateKeyStr, "0x")
+
+	// Parse the hex string to bytes
+	privateKeyBytes, err := hex.DecodeString(cleanPrivateKey)
+	if err != nil {
+		panic(fmt.Sprintf("failed to decode private key: %v", err))
+	}
+
+	// Derive the uncompressed public key (0x04 || X || Y) on secp256k1
+	publicKeyBytes, ok := secp256k1PublicKeyUncompressed(privateKeyBytes)
+	if !ok {
+		panic("failed to parse private key: invalid secp256k1 secret")
+	}
+
+	// Remove the first byte (0x04 prefix) - we only want the 64 bytes (X + Y coordinates)
+	publicKeyWithoutPrefix := publicKeyBytes[1:]
+
+	// Hash the public key with Keccak256
+	keccak := sha3.NewLegacyKeccak256()
+	keccak.Write(publicKeyWithoutPrefix)
+	addressHash := keccak.Sum(nil)
+
+	// Take the last 20 bytes (40 hex chars) as the address
+	addressBytes := addressHash[len(addressHash)-20:]
+
+	// Convert to hex and add 0x prefix
+	return "0x" + hex.EncodeToString(addressBytes)
+}
+
+// ============================= EIP-712 Dynamic Helper Functions ============================= //
+
+// BuildTypedDataFromJS creates an EIP-712 TypedData instance from generic JSON-like maps.
+// The inputs mirror the MetaMask/ethers.js shape: domain, types, primaryType, and message.
+// This avoids having to define Go structs for each payload.
+func BuildTypedDataFromJS(primaryType string, domain map[string]any, rawTypes map[string]any, rawMessage map[string]any) (apitypes.TypedData, error) {
+	typedTypes, inferredPrimary, err := toTypedDataTypes(rawTypes, domain)
+	if err != nil {
+		return apitypes.TypedData{}, err
+	}
+	if primaryType == "" {
+		primaryType = inferredPrimary
+	}
+	if primaryType == "" {
+		return apitypes.TypedData{}, fmt.Errorf("primaryType is required")
+	}
+
+	domainTyped, err := toTypedDataDomain(domain)
+	if err != nil {
+		return apitypes.TypedData{}, err
+	}
+
+	normalizedMsg, err := normalizeTypedMessage(typedTypes, primaryType, rawMessage)
+	if err != nil {
+		return apitypes.TypedData{}, err
+	}
+
+	return apitypes.TypedData{
+		Domain:      domainTyped,
+		Types:       typedTypes,
+		PrimaryType: primaryType,
+		Message:     normalizedMsg,
+	}, nil
+}
+
+// EncodeTypedData returns the EIP-712 digest "\x19\x01" + domainSeparator + hashStruct(message)
+func (this *BaseExchange) EncodeTypedData(td apitypes.TypedData) ([]byte, error) {
+	domainSeparator, err := td.HashStruct("EIP712Domain", td.Domain.Map())
+	if err != nil {
+		return []byte{}, err
+	}
+	typedDataHash, err := td.HashStruct(td.PrimaryType, td.Message)
+	if err != nil {
+		return []byte{}, err
+	}
+	prefix := []byte{0x19, 0x01}
+	rawData := append(append(prefix, domainSeparator...), typedDataHash...)
+	return rawData, nil
+}
+
+func toTypedDataTypes(rawTypes map[string]any, domain map[string]any) (map[string][]apitypes.Type, string, error) {
+	typed := make(map[string][]apitypes.Type, len(rawTypes))
+
+	for typeName, fieldsAny := range rawTypes {
+		fields, ok := fieldsAny.([]any)
+		if !ok {
+			return nil, "", fmt.Errorf("types[%s] must be array", typeName)
+		}
+		typedFields := make([]apitypes.Type, len(fields))
+		for i, fAny := range fields {
+			fMap, ok := fAny.(map[string]any)
+			if !ok {
+				return nil, "", fmt.Errorf("types[%s][%d] must be object", typeName, i)
+			}
+			nameVal, _ := fMap["name"].(string)
+			typeVal, _ := fMap["type"].(string)
+			typedFields[i] = apitypes.Type{Name: nameVal, Type: typeVal}
+		}
+		typed[typeName] = typedFields
+	}
+
+	// The EIP-712 primary (root) type is the struct that no other struct
+	// references as a field type — ethers' TypedDataEncoder infers it the same
+	// way. This is required for nested typed data such as the ERC-7739
+	// TypedDataSign(Order contents,…) wrapper, where the root is TypedDataSign
+	// (it references Order), not Order itself.
+	referenced := make(map[string]bool)
+	for _, fields := range typed {
+		for _, f := range fields {
+			base := strings.TrimSuffix(f.Type, "[]")
+			referenced[base] = true
+		}
+	}
+	candidates := []string{}
+	for typeName := range typed {
+		if typeName == "EIP712Domain" {
+			continue
+		}
+		if !referenced[typeName] {
+			candidates = append(candidates, typeName)
+		}
+	}
+	inferred := ""
+	if len(candidates) == 1 {
+		inferred = candidates[0]
+	} else if _, ok := rawTypes["OrderWithBuilderFee"]; ok {
+		inferred = "OrderWithBuilderFee"
+	} else if _, ok := rawTypes["Order"]; ok {
+		inferred = "Order"
+	} else {
+		for typeName := range rawTypes {
+			if inferred == "" {
+				inferred = typeName
+			}
+		}
+	}
+
+	// Add EIP712Domain type based on what's actually in the domain
+	if _, exists := typed["EIP712Domain"]; !exists {
+		domainFields := []apitypes.Type{}
+		if _, ok := domain["name"]; ok {
+			domainFields = append(domainFields, apitypes.Type{Name: "name", Type: "string"})
+		}
+		if _, ok := domain["version"]; ok {
+			domainFields = append(domainFields, apitypes.Type{Name: "version", Type: "string"})
+		}
+		if _, ok := domain["chainId"]; ok {
+			domainFields = append(domainFields, apitypes.Type{Name: "chainId", Type: "uint256"})
+		}
+		if _, ok := domain["verifyingContract"]; ok {
+			domainFields = append(domainFields, apitypes.Type{Name: "verifyingContract", Type: "address"})
+		}
+		typed["EIP712Domain"] = domainFields
+	}
+
+	return typed, inferred, nil
+}
+
+func toTypedDataDomain(domain map[string]any) (apitypes.TypedDataDomain, error) {
+	var d apitypes.TypedDataDomain
+	if domain == nil {
+		return d, nil
+	}
+	// domain fields arrive from generated exchange code, where Safe* now yields
+	// pointer-carried scalars; a raw type assertion would silently drop them and
+	// geth would then report the field as '<nil>' during hashing
+	if v, ok := derefScalar(domain["name"]).(string); ok {
+		d.Name = v
+	}
+	if v, ok := derefScalar(domain["version"]).(string); ok {
+		d.Version = v
+	}
+	if v, ok := derefScalar(domain["verifyingContract"]).(string); ok {
+		d.VerifyingContract = v
+	}
+	if v, ok := domain["chainId"]; ok && derefScalar(v) != nil {
+		bi, err := toBigInt(v)
+		if err != nil {
+			return d, fmt.Errorf("chainId: %w", err)
+		}
+		d.ChainId = (*math.HexOrDecimal256)(bi)
+	}
+	return d, nil
+}
+
+func normalizeTypedMessage(types map[string][]apitypes.Type, primaryType string, value any) (apitypes.TypedDataMessage, error) {
+	structVal, err := normalizeStruct(types, primaryType, value)
+	if err != nil {
+		return nil, err
+	}
+	return structVal, nil
+}
+
+func normalizeStruct(types map[string][]apitypes.Type, typeName string, value any) (apitypes.TypedDataMessage, error) {
+	obj, ok := derefScalar(value).(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("value for %s must be object", typeName)
+	}
+	fields, ok := types[typeName]
+	if !ok {
+		return nil, fmt.Errorf("type %s not found in types", typeName)
+	}
+	out := make(apitypes.TypedDataMessage)
+
+	// Include all fields from type definition - ALL fields must be present
+	for _, f := range fields {
+		raw, exists := obj[f.Name]
+		raw = derefScalar(raw)
+
+		// If field doesn't exist or is nil, provide default zero value
+		if !exists || raw == nil {
+			defaultVal := getDefaultValueForType(f.Type)
+			out[f.Name] = defaultVal
+			continue
+		}
+
+		conv, err := normalizeValue(types, f.Type, raw)
+		if err != nil {
+			return nil, fmt.Errorf("field %s (type %s, value %v): %w", f.Name, f.Type, raw, err)
+		}
+		out[f.Name] = conv
+	}
+	return out, nil
+}
+
+func getDefaultValueForType(typeName string) any {
+	// Handle arrays
+	if strings.HasSuffix(typeName, "[]") {
+		return []any{}
+	}
+
+	// Handle integers
+	if strings.HasPrefix(typeName, "uint") || strings.HasPrefix(typeName, "int") {
+		return big.NewInt(0)
+	}
+
+	// Handle address
+	if typeName == "address" {
+		return common.HexToAddress("0x0000000000000000000000000000000000000000")
+	}
+
+	// Handle bool
+	if typeName == "bool" {
+		return false
+	}
+
+	// Handle bytes
+	if strings.HasPrefix(typeName, "bytes") {
+		if typeName == "bytes" {
+			return []byte{}
+		}
+		// Fixed size bytes (bytes32, etc)
+		return []byte{}
+	}
+
+	// Handle string
+	if typeName == "string" {
+		return ""
+	}
+
+	// For custom types/structs, return empty map
+	return make(map[string]any)
+}
+
+func normalizeValue(types map[string][]apitypes.Type, typeName string, value any) (any, error) {
+	if strings.HasSuffix(typeName, "[]") {
+		base := strings.TrimSuffix(typeName, "[]")
+
+		// Handle empty arrays or nil
+		if value == nil {
+			if _, isStruct := types[base]; isStruct {
+				return []apitypes.TypedDataMessage{}, nil
+			}
+			return []any{}, nil
+		}
+
+		arr, ok := value.([]any)
+		if !ok {
+			return nil, fmt.Errorf("expected array for %s", typeName)
+		}
+
+		// Check if the base type is a struct
+		if _, isStruct := types[base]; isStruct {
+			// For array of structs, return as []apitypes.TypedDataMessage
+			out := make([]apitypes.TypedDataMessage, len(arr))
+			for i, v := range arr {
+				structVal, err := normalizeStruct(types, base, v)
+				if err != nil {
+					return nil, fmt.Errorf("index %d: %w", i, err)
+				}
+				out[i] = structVal
+			}
+			return out, nil
+		}
+
+		// For array of primitives
+		out := make([]any, len(arr))
+		for i, v := range arr {
+			conv, err := normalizeValue(types, base, v)
+			if err != nil {
+				return nil, fmt.Errorf("index %d: %w", i, err)
+			}
+			out[i] = conv
+		}
+		return out, nil
+	}
+
+	if _, isStruct := types[typeName]; isStruct {
+		return normalizeStruct(types, typeName, value)
+	}
+
+	switch {
+	case strings.HasPrefix(typeName, "uint") || strings.HasPrefix(typeName, "int"):
+		bi, err := toBigInt(value)
+		if err != nil {
+			return nil, err
+		}
+		// For smaller integer types (not 256-bit), validate they fit in range
+		// and return the big.Int (the library will validate the range)
+		return bi, nil
+	case typeName == "address":
+		if s, ok := value.(string); ok {
+			addr := common.HexToAddress(s)
+			return addr.Bytes(), nil
+		}
+		if addr, ok := value.(common.Address); ok {
+			return addr.Bytes(), nil
+		}
+		return value, nil
+	case strings.HasPrefix(typeName, "bytes") && typeName != "bytes":
+		if s, ok := value.(string); ok {
+			b, err := hex.DecodeString(strings.TrimPrefix(s, "0x"))
+			if err != nil {
+				return nil, fmt.Errorf("decode %s: %w", typeName, err)
+			}
+			return b, nil
+		}
+		// Handle byte slices that are already decoded
+		if b, ok := value.([]byte); ok {
+			return b, nil
+		}
+		return value, nil
+	default:
+		return value, nil
+	}
+}
+
+func toBigInt(v any) (*big.Int, error) {
+	switch n := derefScalar(v).(type) {
+	case nil:
+		return nil, fmt.Errorf("nil int value")
+	case *big.Int:
+		return n, nil
+	case json.Number:
+		return parseBigIntString(n.String())
+	case string:
+		return parseBigIntString(n)
+	case int:
+		return big.NewInt(int64(n)), nil
+	case int64:
+		return big.NewInt(n), nil
+	case uint64:
+		return new(big.Int).SetUint64(n), nil
+	case float64:
+		return big.NewInt(int64(n)), nil
+	default:
+		return nil, fmt.Errorf("unsupported int type %T", v)
+	}
+}
+
+func parseBigIntString(s string) (*big.Int, error) {
+	radix := 10
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		radix = 16
+		s = s[2:]
+	}
+	bi, ok := new(big.Int).SetString(s, radix)
+	if !ok {
+		return nil, fmt.Errorf("invalid integer string")
+	}
+	return bi, nil
+}

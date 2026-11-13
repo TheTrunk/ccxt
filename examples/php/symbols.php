@@ -1,11 +1,10 @@
 <?php
 
-$root = dirname (dirname (dirname (__FILE__)));
+$root = dirname(dirname(dirname(__FILE__)));
 
 include $root . '/ccxt.php';
-include 'Console/Table.php';
 
-date_default_timezone_set ('UTC');
+date_default_timezone_set('UTC');
 
 function style ($s, $style) { return $style . $s . "\033[0m"; }
 function green     ($s) { return style ($s, "\033[92m"); }
@@ -24,11 +23,37 @@ function print_supported_exchanges () {
     dump ('Supported exchanges:', green (implode (', ', $exchanges)));
 }
 
+// renders a plain ASCII table: +---+ rules, left-aligned padded cells
 function tabulate ($headers, $rows) {
-    $tbl = new Console_Table();
-    $tbl->setHeaders ($headers);
-    $tbl->addData ($rows);
-    return $tbl->getTable ();
+    $widths = array ();
+    foreach ($headers as $i => $header) {
+        $widths[$i] = strlen ((string) $header);
+    }
+    foreach ($rows as $row) {
+        foreach (array_values ($row) as $i => $cell) {
+            $length = strlen ((string) $cell);
+            if (!isset ($widths[$i]) || ($length > $widths[$i])) {
+                $widths[$i] = $length;
+            }
+        }
+    }
+    $rule = '+';
+    foreach ($widths as $width) {
+        $rule .= str_repeat ('-', $width + 2) . '+';
+    }
+    $format_row = function ($cells) use ($widths) {
+        $line = '|';
+        foreach ($widths as $i => $width) {
+            $cell = isset ($cells[$i]) ? (string) $cells[$i] : '';
+            $line .= ' ' . str_pad ($cell, $width) . ' |';
+        }
+        return $line;
+    };
+    $table = $rule . "\n" . $format_row (array_values ($headers)) . "\n" . $rule . "\n";
+    foreach ($rows as $row) {
+        $table .= $format_row (array_values ($row)) . "\n";
+    }
+    return $table . $rule . "\n";
 }
 
 function market_table_helper ($market) {
@@ -53,7 +78,7 @@ if (count ($argv) > 1) {
 
     if ($exchange_found) {
 
-        dump ('Instantiating', green ($id), 'exchange exchange');
+        dump ('Instantiating', green ($id), 'exchange');
 
         // instantiate the exchange by id
         $exchange = '\\ccxt\\' . $id;
@@ -66,7 +91,7 @@ if (count ($argv) > 1) {
         dump (green ($id), 'has', count ($exchange->symbols), 'symbols:', yellow (implode (', ', $exchange->symbols)));
 
         // output a table of all markets
-        @dump (tabulate (array ('id', 'symbol', 'base', 'quote', 'taker', 'maker', 'precision', 'limits'), array_map ('market_table_helper', $markets)));
+        @dump (tabulate(array('id', 'symbol', 'base', 'quote', 'taker', 'maker', 'precision', 'limits'), array_map ('market_table_helper', $markets)));
 
     } else {
 

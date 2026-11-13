@@ -1,0 +1,93 @@
+package ccxt
+
+func (this *BaseExchange) initializeProperties(extendedProperties map[string]any) {
+
+	this.TransformedApi = map[string]any{}
+	this.Version = SafeString(extendedProperties, "version", "").(string)
+	this.cacheLoaded = false
+	reqCred := SafeValue(extendedProperties, "requiredCredentials", map[string]interface{}{})
+	this.RequiredCredentials = reqCred.(map[string]interface{})
+	this.ApiKey = SafeString(extendedProperties, "apiKey", "").(string)
+	this.Secret = SafeString(extendedProperties, "secret", "").(string)
+	this.Password = SafeString(extendedProperties, "password", "").(string)
+	this.Login = SafeString(extendedProperties, "login", nil)
+	this.Twofa = SafeString(extendedProperties, "twofa", nil)
+	this.PrivateKey = SafeString(extendedProperties, "privateKey", "").(string)
+	this.WalletAddress = SafeString(extendedProperties, "walletAddress", "").(string)
+	this.Token = SafeString(extendedProperties, "token", nil)
+	this.Uid = SafeString(extendedProperties, "uid", "").(string)
+	this.AccountId = SafeString(extendedProperties, "accountId", "").(string)
+
+	this.UserAgents = SafeValue(extendedProperties, "userAgents", map[string]interface{}{
+		"chrome":    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+		"chrome39":  "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.71 Safari/537.36",
+		"chrome100": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36",
+	}).(map[string]interface{})
+	this.UserAgent = SafeString(extendedProperties, "userAgent", "").(string)
+	this.Timeout = SafeInteger(extendedProperties, "timeout", 10000).(int64)
+	this.MAX_VALUE = SafeFloat(extendedProperties, "MAX_VALUE", 1.7976931348623157e+308).(float64) // math.MaxFloat64
+	this.Id = SafeString(extendedProperties, "id", "Exchange").(string)
+	this.Alias = SafeValue(extendedProperties, "alias", false).(bool)
+
+	this.Api = SafeValue(extendedProperties, "api", map[string]any{}).(map[string]any)
+	this.Hostname = SafeString(extendedProperties, "hostname", "").(string)
+	this.Urls = SafeValue(extendedProperties, "urls", map[string]any{}).(map[string]any)
+
+	this.Options = derefScalar(this.GetDefaultOptions()).(map[string]any)
+	extendedOptions := SafeValue(extendedProperties, "options", map[string]any{}).(map[string]any)
+	for k, v := range extendedOptions {
+		this.Options[k] = v
+	}
+
+	this.Verbose = SafeValue(extendedProperties, "verbose", false).(bool)
+	this.Timeframes = SafeValue(extendedProperties, "timeframes", map[string]any{}).(map[string]any)
+	this.Features = SafeValue(extendedProperties, "features", map[string]any{}).(map[string]any)
+	this.Fees = SafeValue(extendedProperties, "fees", map[string]any{}).(map[string]any)
+	this.Has = SafeValue(extendedProperties, "has", map[string]any{}).(map[string]any)
+	// this.httpExceptions = SafeValue(extendedProperties, "httpExceptions",map[string]any{}).(map[string]any)
+	this.Exceptions = SafeValue(extendedProperties, "exceptions", map[string]any{}).(map[string]any)
+	propertiesMarkets := SafeValue(extendedProperties, "markets", nil)
+	if propertiesMarkets != nil {
+		this.Markets = this.Extend(propertiesMarkets)
+	}
+	propCurrencies := SafeValue(extendedProperties, "currencies", map[string]any{}).(map[string]any)
+	if len(propCurrencies) > 0 {
+		this.Currencies = this.Extend(propCurrencies)
+	}
+	this.EnableRateLimit = SafeValue(extendedProperties, "enableRateLimit", true).(bool)
+	this.RateLimit = SafeFloat(extendedProperties, "rateLimit", -1).(float64)
+	this.RollingWindowSize = SafeFloat(extendedProperties, "rollingWindowSize", 0.0).(float64)
+	this.RateLimiterAlgorithm = SafeString(extendedProperties, "rateLimiterAlgorithm", "leakyBucket").(string)
+	// this.status = SafeValue(extendedProperties, "status",map[string]any{}).(map[string]any)
+	this.PrecisionMode = int(SafeInteger(extendedProperties, "precisionMode", this.PrecisionMode).(int64))
+	this.PaddingMode = int(SafeInteger(extendedProperties, "paddingMode", this.PaddingMode).(int64))
+	this.CommonCurrencies = SafeValue(extendedProperties, "commonCurrencies", map[string]any{}).(map[string]any)
+	subVal := SafeValue(extendedProperties, "substituteCommonCurrencyCodes", true)
+	this.SubstituteCommonCurrencyCodes = subVal != nil && derefScalar(subVal).(bool)
+	this.NetworkAliases = map[string]any{"ETH": "ERC20", "TRX": "TRC20", "BSC": "BEP20", "BSC20": "BEP20", "CRONOS": "CRC20", "ARB": "ARBITRUM", "ARBONE": "ARBITRUM", "ARBNOVA": "ARBITRUM_NOVA"}
+	this.Name = SafeString(extendedProperties, "name", "").(string)
+	this.HttpsProxy = SafeString(extendedProperties, "httpsProxy", nil)
+	this.HttpProxy = SafeString(extendedProperties, "httpProxy", nil)
+	this.NewUpdates = SafeValue(extendedProperties, "newUpdates", true).(bool)
+	this.Accounts = SafeValue(extendedProperties, "accounts", []any{}).([]any)
+
+	this.HttpExceptions = SafeValue(extendedProperties, "httpExceptions", map[string]any{}).(map[string]any)
+	this.Headers = SafeValue(extendedProperties, "headers", map[string]any{}).(map[string]any)
+	this.ReduceFees = SafeValue(extendedProperties, "reduceFees", true).(bool)
+
+	this.ReturnResponseHeaders = SafeValue(extendedProperties, "returnResponseHeaders", false).(bool)
+	this.FetchHistoryCacheSize = SafeValue(extendedProperties, "fetchHistoryCacheSize", 0).(int)
+}
+
+// MapToSafeMap copies the input into a plain dictionary: the safe dictionary type is
+// a plain map now, so the input is no longer wrapped in a concurrent one.
+func (this *BaseExchange) MapToSafeMap(input map[string]any) map[string]any {
+	if input == nil {
+		return nil
+	}
+	copied := make(map[string]any, len(input))
+	for k, v := range input {
+		copied[k] = v
+	}
+	return copied
+}

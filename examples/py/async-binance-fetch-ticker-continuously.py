@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 
@@ -15,9 +18,7 @@ async def main(symbol):
     # this way you request rate will never hit the limit of an exchange
     # the library will throttle your requests to avoid that
 
-    exchange = ccxt.binance({
-        'enableRateLimit': True,  # this option enables the built-in rate limiter
-    })
+    exchange = ccxt.binance()
     while True:
         print('--------------------------------------------------------------')
         print(exchange.iso8601(exchange.milliseconds()), 'fetching', symbol, 'ticker from', exchange.name)
@@ -44,4 +45,4 @@ async def main(symbol):
             break  # won't retry
 
 
-asyncio.get_event_loop().run_until_complete(main('BTC/USDT'))
+run(main('BTC/USDT'))

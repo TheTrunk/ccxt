@@ -1,0 +1,80 @@
+<?php
+
+namespace ccxt\pro;
+
+use SplDoublyLinkedList;
+
+class BaseCache implements \JsonSerializable, \ArrayAccess, \IteratorAggregate, \Countable {
+    public $max_size;
+    public $deque;
+
+    public function __construct($max_size = null) {
+        $this->max_size = $max_size;
+        // the deque implemented in Ds has fast shifting by using doubly linked lists
+        // https://www.php.net/manual/en/class.ds-deque.php
+        // would inherit directly but it is marked as final
+        $this->deque = array();
+        // default mode
+        // $this->deque->setIteratorMode(SplDoublyLinkedList::IT_MODE_FIFO | SplDoublyLinkedList::IT_MODE_KEEP);
+    }
+
+    public function getIterator() : \Traversable {
+        return new \ArrayObject($this->deque);
+    }
+
+    public function JsonSerialize() : array {
+        return $this->deque;
+    }
+
+    public function count() : int {
+        return count($this->deque);
+    }
+
+    public function clear() {
+        $this->deque = array();
+    }
+
+    public function &offsetGet($offset) : mixed {
+        return $this->deque[$offset];
+    }
+
+    public function offsetSet($index, $newval) : void {
+        $this->deque[$index] = $newval;
+    }
+
+    public function offsetExists($index) : bool {
+        return $index < $this->count();
+    }
+
+    public function offsetUnset($index) : void {
+        unset($this->deque[$index]);
+    }
+
+    public function __toString() {
+        return print_r($this->deque, true);
+    }
+
+    // meant to be overriden
+    public function getLimit($symbol, $limit) {
+    }
+
+    // Coerce a hashmap / index key to string via the return type (PHP will
+    // juggle int/float → string). Avoids `(string)` casts and keeps 1.5 / 1.9
+    // from collapsing the way raw PHP array keys would.
+    protected function as_string($value): string {
+        return $value;
+    }
+
+    // Builds a collision-free composite key for the positional index of the
+    // keyed caches. A plain concatenation is ambiguous - ('AB', 'C') and
+    // ('A', 'BC') both produce "ABC" - so the first part is length prefixed,
+    // which makes the encoding injective for every possible pair of strings.
+    protected function index_key(string $first, string $second): string {
+        return strlen($first) . ':' . $first . $second;
+    }
+
+    // support transpiled snake_case calls
+    public function get_limit($symbol, $limit) {
+        return $this->getLimit($symbol, $limit);
+    }
+}

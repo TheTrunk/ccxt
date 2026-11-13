@@ -1,0 +1,96 @@
+<?php
+
+namespace ccxt\pro;
+
+// rounding mode duplicated from CCXT
+// const TRUNCATE = 0;
+// const ROUND = 1;
+// const ROUND_UP = 2;
+// const ROUND_DOWN = 3;
+
+class Exchange extends \ccxt\async\Exchange {
+
+    public static $exchanges = array();
+}
+
+// the override below is technically an error
+// todo: fix the conflict of ccxt.exchanges vs ccxtpro.exchanges
+
+Exchange::$exchanges = array(
+    'alpaca',
+    'apex',
+    'aster',
+    'backpack',
+    'bequant',
+    'binance',
+    'binancecoinm',
+    'binanceus',
+    'binanceusdm',
+    'bingx',
+    'bitfinex',
+    'bitget',
+    'bithumb',
+    'bitopro',
+    'bitrue',
+    'bitstamp',
+    'bittrade',
+    'bitvavo',
+    'blockchaincom',
+    'blofin',
+    'bullish',
+    'bybit',
+    'bybiteu',
+    'bybitid',
+    'cex',
+    'coinbase',
+    'coinbaseexchange',
+    'coinbaseinternational',
+    'coincheck',
+    'coinone',
+    'cryptocom',
+    'deepcoin',
+    'deribit',
+    'derive',
+    'dydx',
+    'extended',
+    'gate',
+    'gateeu',
+    'gemini',
+    'grvt',
+    'hashkey',
+    'hitbtc',
+    'hollaex',
+    'htx',
+    'hyperliquid',
+    'independentreserve',
+    'kraken',
+    'krakenfutures',
+    'kucoin',
+    'kucoinfutures',
+    'lbank',
+    'lighter',
+    'luno',
+    'mexc',
+    'modetrade',
+    'mudrex',
+    'myokx',
+    'nado',
+    'ndax',
+    'okx',
+    'okxus',
+    'onetrading',
+    'p2b',
+    'pacifica',
+    'paradex',
+    'phemex',
+    'poloniex',
+    'polymarket',
+    'toobit',
+    'upbit',
+    'weex',
+    'whitebit',
+    'woo',
+    'woofipro',
+    'xt',
+);
+

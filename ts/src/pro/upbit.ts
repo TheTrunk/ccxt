@@ -1,0 +1,755 @@
+
+//  ---------------------------------------------------------------------------
+
+import { sha256 } from '@noble/hashes/sha2.js';
+import upbitRest from '../upbit.js';
+import { ArrayCache, ArrayCacheBySymbolById } from '../base/ws/Cache.js';
+import type { Int, Str, Order, OrderBook, Trade, Ticker, Dict, Balances, Tickers, Strings, OHLCV, Market, FeeString } from '../base/types.js';
+import { jwt } from '../base/functions/rsa.js';
+import { Precise } from '../base/Precise.js';
+import Client from '../base/ws/Client.js';
+import { NotSupported } from '../base/errors.js';
+import type { WsOrderBook } from '../base/ws/OrderBook.js';
+
+//  ---------------------------------------------------------------------------
+
+export default class upbit extends upbitRest {
+    override describe (): Dict {
+        return this.deepExtend (super.describe (), {
+            'has': {
+                'ws': true,
+                'watchOrderBook': true,
+                'watchTicker': true,
+                'watchTickers': true,
+                'watchTrades': true,
+                'watchTradesForSymbols': true,
+                'watchOHLCV': true,
+                'watchOrders': true,
+                'watchMyTrades': true,
+                'watchBalance': true,
+            },
+            'urls': {
+                'api': {
+                    'ws': 'wss://{hostname}/websocket/v1',
+                },
+            },
+            'options': {
+                'tradesLimit': 1000,
+            },
+        });
+    }
+
+    async watchPublicMultiple (symbols: Strings, channel: Str, params: Dict = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets ();
+        }
+        const symbolsRequested: string[] = (symbols === undefined) ? this.symbols : symbols;
+        const symbolsNormalized = this.marketSymbols (symbolsRequested);
+        const marketIds = this.marketIds (symbolsNormalized);
+        const url = this.implodeParams (this.safeString (this.urls['api'], 'ws'), {
+            'hostname': this.hostname,
+        });
+        const client = this.client (url);
+        const subscriptionsKey = 'upbitPublicSubscriptions';
+        if (!(subscriptionsKey in client.subscriptions)) {
+            client.subscriptions[subscriptionsKey] = this.createSafeDictionary (true);
+        }
+        const subscriptions = this.safeDict (client.subscriptions, subscriptionsKey, {});
+        const messageHashes: string[] = [];
+        for (let i = 0; i < symbolsNormalized.length; i++) {
+            const marketId = this.safeString (marketIds, i, '');
+            const symbol = this.safeString (symbolsNormalized, i, '');
+            const messageHash = channel + ':' + symbol;
+            messageHashes.push (messageHash);
+            if (!(messageHash in subscriptions)) {
+                subscriptions[messageHash] = {
+                    'type': channel,
+                    'codes': [ marketId ],
+                };
+            }
+        }
+        const finalMessage = [
+            {
+                'ticket': this.uuid (),
+            },
+        ];
+        const channelKeys = Object.keys (subscriptions);
+        for (let i = 0; i < channelKeys.length; i++) {
+            const key = channelKeys[i];
+            finalMessage.push (subscriptions[key]);
+        }
+        return await this.watchMultiple (url, messageHashes, finalMessage, messageHashes);
+    }
+
+    /**
+     * @method
+     * @name upbit#watchTicker
+     * @description watches a price ticker, a statistical calculation with the information calculated over the past 24 hours for a specific market
+     * @see https://global-docs.upbit.com/reference/websocket-ticker
+     * @param {string} symbol unified symbol of the market to fetch the ticker for
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a [ticker structure]{@link https://docs.ccxt.com/?id=ticker-structure}
+     */
+    override watchTicker (symbol: string, params: Dict = {}): Promise<Ticker> {
+        return this.watchPublicMultiple ([ symbol ], 'ticker');
+    }
+
+    /**
+     * @method
+     * @name upbit#watchTickers
+     * @description watches a price ticker, a statistical calculation with the information calculated over the past 24 hours for all markets of a specific list
+     * @see https://global-docs.upbit.com/reference/websocket-ticker
+     * @param {string[]} symbols unified symbol of the market to fetch the ticker for
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a [ticker structure]{@link https://docs.ccxt.com/?id=ticker-structure}
+     */
+    override async watchTickers (symbols: Strings = undefined, params: Dict = {}): Promise<Tickers> {
+        const newTickers = await this.watchPublicMultiple (symbols, 'ticker');
+        if (this.newUpdates) {
+            const tickers: Dict = {};
+            const newTickersSymbol = this.safeString (newTickers, 'symbol');
+            if (newTickersSymbol !== undefined) {
+                tickers[newTickersSymbol] = newTickers;
+            }
+            return tickers;
+        }
+        return this.filterByArray (this.tickers, 'symbol', symbols);
+    }
+
+    /**
+     * @method
+     * @name upbit#watchTrades
+     * @description get the list of most recent trades for a particular symbol
+     * @see https://global-docs.upbit.com/reference/websocket-trade
+     * @param {string} symbol unified symbol of the market to fetch trades for
+     * @param {int} [since] timestamp in ms of the earliest trade to fetch
+     * @param {int} [limit] the maximum amount of trades to fetch
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=public-trades}
+     */
+    override watchTrades (symbol: string, since: Int = undefined, limit: Int = undefined, params: Dict = {}): Promise<Trade[]> {
+        return this.watchTradesForSymbols ([ symbol ], since, limit, params);
+    }
+
+    /**
+     * @method
+     * @name upbit#watchTradesForSymbols
+     * @description get the list of most recent trades for a list of symbols
+     * @see https://global-docs.upbit.com/reference/websocket-trade
+     * @param {string[]} symbols unified symbol of the market to fetch trades for
+     * @param {int} [since] timestamp in ms of the earliest trade to fetch
+     * @param {int} [limit] the maximum amount of trades to fetch
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=public-trades}
+     */
+    override async watchTradesForSymbols (symbols: string[], since: Int = undefined, limit: Int = undefined, params: Dict = {}): Promise<Trade[]> {
+        const trades = await this.watchPublicMultiple (symbols, 'trade');
+        const first = this.safeDict (trades, 0);
+        const tradeSymbol = this.safeString (first, 'symbol');
+        let limitResolved = limit;
+        if (this.newUpdates) {
+            limitResolved = trades.getLimit (tradeSymbol, limit);
+        }
+        return this.filterBySinceLimit (trades, since, limitResolved, 'timestamp', true);
+    }
+
+    /**
+     * @method
+     * @name upbit#watchOrderBook
+     * @description watches information on open orders with bid (buy) and ask (sell) prices, volumes and other data
+     * @see https://global-docs.upbit.com/reference/websocket-orderbook
+     * @param {string} symbol unified symbol of the market to fetch the order book for
+     * @param {int} [limit] the maximum amount of order book entries to return
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} an [order book structure]{@link https://docs.ccxt.com/?id=order-book-structure}
+     */
+    override async watchOrderBook (symbol: string, limit: Int = undefined, params: Dict = {}): Promise<OrderBook> {
+        const orderbook: WsOrderBook = await this.watchPublicMultiple ([ symbol ], 'orderbook');
+        return orderbook.limit ();
+    }
+
+    /**
+     * @method
+     * @name upbit#watchOHLCV
+     * @description watches information an OHLCV with timestamp, openingPrice, highPrice, lowPrice, tradePrice, baseVolume in 1s.
+     * @see https://docs.upbit.com/kr/reference/websocket-candle for Upbit KR
+     * @see https://global-docs.upbit.com/reference/websocket-candle for Upbit Global
+     * @param {string} symbol unified market symbol of the market orders were made in
+     * @param {string} timeframe specifies the OHLCV candle interval to watch. As of now, Upbit only supports 1s candles.
+     * @param {int} [since] the earliest time in ms to fetch orders for
+     * @param {int} [limit] the maximum number of order structures to retrieve
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {OHLCV[]} a list of [OHLCV structures]{@link https://docs.ccxt.com/?id=ohlcv-structure}
+     */
+    override async watchOHLCV (symbol: string, timeframe: string = '1s', since: Int = undefined, limit: Int = undefined, params: Dict = {}): Promise<OHLCV[]> {
+        if (timeframe !== '1s') {
+            throw new NotSupported (this.id + ' watchOHLCV does not support' + timeframe + ' candle.');
+        }
+        const timeFrameOHLCV = 'candle.' + timeframe;
+        return await this.watchPublicMultiple ([ symbol ], timeFrameOHLCV);
+    }
+
+    handleTicker (client: Client, message: Dict) {
+        // 2020-03-17T23:07:36.511Z "onMessage" <Buffer 7b 22 74 79 70 65 22 3a 22 74 69 63 6b 65 72 22 2c 22 63 6f 64 65 22 3a 22 42 54 43 2d 45 54 48 22 2c 22 6f 70 65 6e 69 6e 67 5f 70 72 69 63 65 22 3a ... >
+        // { type: "ticker",
+        //   "code": "BTC-ETH",
+        //   "opening_price": 0.02295092,
+        //   "high_price": 0.02295092,
+        //   "low_price": 0.02161249,
+        //   "trade_price": 0.02161249,
+        //   "prev_closing_price": 0.02185802,
+        //   "acc_trade_price": 2.32732482,
+        //   "change": "FALL",
+        //   "change_price": 0.00024553,
+        //   "signed_change_price": -0.00024553,
+        //   "change_rate": 0.0112329479,
+        //   "signed_change_rate": -0.0112329479,
+        //   "ask_bid": "ASK",
+        //   "trade_volume": 2.12,
+        //   "acc_trade_volume": 106.11798418,
+        //   "trade_date": "20200317",
+        //   "trade_time": "215843",
+        //   "trade_timestamp": 1584482323000,
+        //   "acc_ask_volume": 90.16935908,
+        //   "acc_bid_volume": 15.9486251,
+        //   "highest_52_week_price": 0.03537414,
+        //   "highest_52_week_date": "2019-04-08",
+        //   "lowest_52_week_price": 0.01614901,
+        //   "lowest_52_week_date": "2019-09-06",
+        //   "trade_status": null,
+        //   "market_state": "ACTIVE",
+        //   "market_state_for_ios": null,
+        //   "is_trading_suspended": false,
+        //   "delisting_date": null,
+        //   "market_warning": "NONE",
+        //   "timestamp": 1584482323378,
+        //   "acc_trade_price_24h": 2.5955306323568927,
+        //   "acc_trade_volume_24h": 118.38798416,
+        //   "stream_type": "SNAPSHOT" }
+        const ticker = this.parseTicker (message);
+        const symbol = ticker['symbol'];
+        if (symbol !== undefined) {
+            this.tickers[symbol] = ticker;
+        }
+        const messageHash = 'ticker:' + symbol;
+        client.resolve (ticker, messageHash);
+    }
+
+    handleOrderBook (client: Client, message: Dict) {
+        // { type: "orderbook",
+        //   "code": "BTC-ETH",
+        //   "timestamp": 1584486737444,
+        //   "total_ask_size": 16.76384456,
+        //   "total_bid_size": 168.9020623,
+        //   "orderbook_units":
+        //    [ { ask_price: 0.02295077,
+        //        "bid_price": 0.02161249,
+        //        "ask_size": 3.57100696,
+        //        "bid_size": 22.5303265 },
+        //      { ask_price: 0.02295078,
+        //        "bid_price": 0.02152658,
+        //        "ask_size": 0.52451651,
+        //        "bid_size": 2.30355128 },
+        //      { ask_price: 0.02295086,
+        //        "bid_price": 0.02150802,
+        //        "ask_size": 1.585,
+        //        "bid_size": 5 }, ... ],
+        //   "stream_type": "SNAPSHOT" }
+        const marketId = this.safeString (message, 'code');
+        const symbol = this.safeSymbol (marketId, undefined, '-');
+        const type = this.safeString (message, 'stream_type');
+        const options = this.safeDict (this.options, 'watchOrderBook', {});
+        const limit = this.safeInteger (options, 'limit', 15);
+        if ((type === 'SNAPSHOT') && !(symbol in this.orderbooks)) {
+            this.orderbooks[symbol] = this.orderBook ({}, limit);
+        }
+        const orderbook = this.orderbooks[symbol];
+        // upbit always returns a snapshot of 15 topmost entries
+        // the "REALTIME" deltas are not incremental
+        // therefore we reset the orderbook on each update
+        // and reinitialize it again with new bidasks
+        const data: Dict[] = this.safeList (message, 'orderbook_units', []);
+        const timestamp = this.safeInteger (message, 'timestamp');
+        const bidsSnapshot: any[] = [];
+        const asksSnapshot: any[] = [];
+        for (let i = 0; i < data.length; i++) {
+            const entry = this.safeDict (data, i);
+            const bidPrice = this.safeNumber (entry, 'bid_price');
+            const bidSize = this.safeNumber (entry, 'bid_size');
+            const askPrice = this.safeNumber (entry, 'ask_price');
+            const askSize = this.safeNumber (entry, 'ask_size');
+            if ((bidPrice !== undefined) && (bidSize !== undefined)) {
+                bidsSnapshot.push ([ bidPrice, bidSize ]);
+            }
+            if ((askPrice !== undefined) && (askSize !== undefined)) {
+                asksSnapshot.push ([ askPrice, askSize ]);
+            }
+        }
+        const snapshot = this.parseOrderBook ({ 'bids': bidsSnapshot, 'asks': asksSnapshot }, symbol, timestamp);
+        orderbook.reset (snapshot);
+        const messageHash = 'orderbook:' + symbol;
+        client.resolve (orderbook, messageHash);
+    }
+
+    handleTrades (client: Client, message: Dict) {
+        // { type: "trade",
+        //   "code": "KRW-BTC",
+        //   "timestamp": 1584508285812,
+        //   "trade_date": "2020-03-18",
+        //   "trade_time": "05:11:25",
+        //   "trade_timestamp": 1584508285000,
+        //   "trade_price": 6747000,
+        //   "trade_volume": 0.06499468,
+        //   "ask_bid": "ASK",
+        //   "prev_closing_price": 6774000,
+        //   "change": "FALL",
+        //   "change_price": 27000,
+        //   "sequential_id": 1584508285000002,
+        //   "stream_type": "REALTIME" }
+        const trade = this.parseTrade (message);
+        const symbol = trade['symbol'];
+        if (symbol === undefined) {
+            return;
+        }
+        let stored = this.safeValue (this.trades, symbol);
+        if (stored === undefined) {
+            const limit = this.safeInteger (this.options, 'tradesLimit', 1000);
+            stored = new ArrayCache (limit);
+            this.trades[symbol] = stored;
+        }
+        stored.append (trade);
+        const messageHash = 'trade:' + symbol;
+        client.resolve (stored, messageHash);
+    }
+
+    handleOHLCV (client: Client, message: Dict) {
+        // {
+        //     type: 'candle.1s',
+        //     code: 'KRW-USDT',
+        //     candle_date_time_utc: '2025-04-22T09:50:34',
+        //     candle_date_time_kst: '2025-04-22T18:50:34',
+        //     opening_price: 1438,
+        //     high_price: 1438,
+        //     low_price: 1438,
+        //     trade_price: 1438,
+        //     candle_acc_trade_volume: 1145.8935,
+        //     candle_acc_trade_price: 1647794.853,
+        //     timestamp: 1745315434125,
+        //     stream_type: 'REALTIME'
+        //   }
+        const marketId = this.safeString (message, 'code');
+        const symbol = this.safeSymbol (marketId);
+        const messageHash = 'candle.1s:' + symbol;
+        const ohlcv = this.parseOHLCV (message);
+        client.resolve (ohlcv, messageHash);
+    }
+
+    authenticate (params: Dict = {}) {
+        this.checkRequiredCredentials ();
+        const wsOptions = this.safeDict (this.options, 'ws', {});
+        const authenticated = this.safeString (wsOptions, 'token');
+        if (authenticated === undefined) {
+            const auth: Dict = {
+                'access_key': this.apiKey,
+                'nonce': this.uuid (),
+            };
+            const token = jwt (auth, this.encode (this.secret), sha256, false);
+            wsOptions['token'] = token;
+            wsOptions['options'] = {
+                'headers': {
+                    'authorization': 'Bearer ' + token,
+                },
+            };
+            this.options['ws'] = wsOptions;
+        }
+    }
+
+    async watchPrivate (symbol: Str, channel: string, messageHash: string, params: Dict = {}) {
+        this.authenticate ();
+        const request: Dict = {
+            'type': channel,
+        };
+        let messageHashResolved: string = messageHash;
+        let channelKey: string = channel;
+        if (symbol !== undefined) {
+            await this.loadMarkets ();
+            const market = this.market (symbol);
+            const symbolResolved = this.safeString (market, 'symbol', '');
+            request['codes'] = this.marketIds ([ symbolResolved ]);
+            messageHashResolved = messageHash + ':' + symbolResolved;
+            channelKey = channel + ':' + symbolResolved;
+        }
+        const url = this.implodeParams (this.safeString (this.urls['api'], 'ws'), {
+            'hostname': this.hostname,
+        }) + '/private';
+        const client = this.client (url);
+        // Track private channel subscriptions to support multiple concurrent watches
+        const subscriptionsKey = 'upbitPrivateSubscriptions';
+        if (!(subscriptionsKey in client.subscriptions)) {
+            client.subscriptions[subscriptionsKey] = this.createSafeDictionary (true);
+        }
+        const subscriptions = this.safeDict (client.subscriptions, subscriptionsKey, {});
+        const isNewChannel = !(channelKey in subscriptions);
+        if (isNewChannel) {
+            subscriptions[channelKey] = request;
+        }
+        // Build subscription message with all requested private channels
+        // Format: [{'ticket': uuid}, {'type': 'myOrder'}, {'type': 'myAsset'}, ...]
+        const message: Dict[] = [
+            {
+                'ticket': this.uuid (),
+            },
+        ];
+        const channelKeys = Object.keys (subscriptions);
+        for (let i = 0; i < channelKeys.length; i++) {
+            message.push (subscriptions[channelKeys[i]]);
+        }
+        return await this.watch (url, messageHashResolved, message, messageHashResolved);
+    }
+
+    /**
+     * @method
+     * @name upbit#watchOrders
+     * @description watches information on multiple orders made by the user
+     * @see https://global-docs.upbit.com/reference/websocket-myorder
+     * @param {string} symbol unified market symbol of the market orders were made in
+     * @param {int} [since] the earliest time in ms to fetch orders for
+     * @param {int} [limit] the maximum number of order structures to retrieve
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    override async watchOrders (symbol: Str = undefined, since: Int = undefined, limit: Int = undefined, params: Dict = {}): Promise<Order[]> {
+        if (this.markets === undefined) {
+            await this.loadMarkets ();
+        }
+        const channel = 'myOrder';
+        const messageHash = 'myOrder';
+        const orders = await this.watchPrivate (symbol, channel, messageHash);
+        let limitResolved = limit;
+        if (this.newUpdates) {
+            limitResolved = orders.getLimit (symbol, limit);
+        }
+        return this.filterBySymbolSinceLimit (orders, symbol, since, limitResolved, true);
+    }
+
+    /**
+     * @method
+     * @name upbit#watchMyTrades
+     * @description watches information on multiple trades made by the user
+     * @see https://global-docs.upbit.com/reference/websocket-myorder
+     * @param {string} symbol unified market symbol of the market orders were made in
+     * @param {int} [since] the earliest time in ms to fetch orders for
+     * @param {int} [limit] the maximum number of order structures to retrieve
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
+     */
+    override async watchMyTrades (symbol: Str = undefined, since: Int = undefined, limit: Int = undefined, params: Dict = {}): Promise<Trade[]> {
+        if (this.markets === undefined) {
+            await this.loadMarkets ();
+        }
+        const channel = 'myOrder';
+        const messageHash = 'myTrades';
+        const trades = await this.watchPrivate (symbol, channel, messageHash);
+        let limitResolved = limit;
+        if (this.newUpdates) {
+            limitResolved = trades.getLimit (symbol, limit);
+        }
+        return this.filterBySymbolSinceLimit (trades, symbol, since, limitResolved, true);
+    }
+
+    parseWsOrderStatus (status: Str): Str {
+        const statuses: Dict = {
+            'wait': 'open',
+            'done': 'closed',
+            'cancel': 'canceled',
+            'watch': 'open', // not sure what this status means
+            'trade': 'open',
+        };
+        if (status === undefined) {
+            return undefined;
+        }
+        return this.safeString (statuses, status, status);
+    }
+
+    override parseWsOrder (order: Dict, market: Market = undefined): Order {
+        //
+        // {
+        //     "type": "myOrder",
+        //     "code": "SGD-XRP",
+        //     "uuid": "ac2dc2a3-fce9-40a2-a4f6-5987c25c438f",
+        //     "ask_bid": "BID",
+        //     "order_type": "limit",
+        //     "state": "trade",
+        //     "trade_uuid": "68315169-fba4-4175-ade3-aff14a616657",
+        //     "price": 0.001453,                 // order price, or the fill price when state is trade
+        //     "avg_price": 0.00145372,
+        //     "volume": 30925891.29839369,       // order volume, or the fill volume when state is trade
+        //     "remaining_volume": 29968038.09235948,
+        //     "executed_volume": 30925891.29839369,
+        //     "trades_count": 1,
+        //     "reserved_fee": 44.23943970238218,
+        //     "remaining_fee": 21.77177967409916,
+        //     "paid_fee": 22.467660028283017,    // cumulative
+        //     "locked": 43565.33112787242,
+        //     "executed_funds": 44935.32005656603,
+        //     "time_in_force": null,
+        //     "trade_fee": 22.467660028283017,   // fee of the fill, null unless state is trade
+        //     "is_maker": true,                  // null unless state is trade
+        //     "identifier": "test-1",
+        //     "smp_type": "cancel_maker",
+        //     "prevented_volume": 1.174291929,
+        //     "prevented_locked": 0.001706246173,
+        //     "trade_timestamp": 1710751590421,
+        //     "order_timestamp": 1710751590000,
+        //     "timestamp": 1710751597500,
+        //     "stream_type": "REALTIME"
+        // }
+        //
+        const id = this.safeString (order, 'uuid');
+        let side = this.safeStringLower (order, 'ask_bid');
+        if (side === 'bid') {
+            side = 'buy';
+        } else if (side === 'ask') {
+            side = 'sell';
+        }
+        const timestamp = this.safeInteger (order, 'order_timestamp');
+        const rawStatus = this.safeString (order, 'state');
+        const status = this.parseWsOrderStatus (rawStatus);
+        const marketId = this.safeString (order, 'code');
+        const marketResolved: Market = this.safeMarket (marketId, market);
+        let fee: FeeString = undefined;
+        const feeCost = this.safeString (order, 'paid_fee');
+        if (feeCost !== undefined) {
+            fee = {
+                'currency': marketResolved['quote'],
+                'cost': feeCost,
+            };
+        }
+        // when state is trade the price and volume fields describe the fill, not the order:
+        // fall back to the average fill price and let the order volume derive from filled + remaining
+        const isTrade = (rawStatus === 'trade');
+        const price = isTrade ? this.safeString (order, 'avg_price') : this.safeString (order, 'price');
+        const amount = isTrade ? undefined : this.safeString (order, 'volume');
+        return this.safeOrder ({
+            'info': order,
+            'id': id,
+            'clientOrderId': this.safeString (order, 'identifier'),
+            'timestamp': timestamp,
+            'datetime': this.iso8601 (timestamp),
+            'lastTradeTimestamp': this.safeInteger (order, 'trade_timestamp'),
+            'lastUpdateTimestamp': this.safeInteger (order, 'timestamp'),
+            'symbol': marketResolved['symbol'],
+            'type': this.safeString (order, 'order_type'),
+            'timeInForce': this.safeString (order, 'time_in_force'),
+            'postOnly': undefined,
+            'side': side,
+            'price': price,
+            'stopPrice': undefined,
+            'triggerPrice': undefined,
+            'cost': this.safeString (order, 'executed_funds'),
+            'average': this.safeString (order, 'avg_price'),
+            'amount': amount,
+            'filled': this.safeString (order, 'executed_volume'),
+            'remaining': this.safeString (order, 'remaining_volume'),
+            'status': status,
+            'fee': fee,
+            'trades': undefined,
+        });
+    }
+
+    override parseWsTrade (trade: Dict, market: Market = undefined): Trade {
+        // see: parseWsOrder
+        let side = this.safeStringLower (trade, 'ask_bid');
+        if (side === 'bid') {
+            side = 'buy';
+        } else if (side === 'ask') {
+            side = 'sell';
+        }
+        const timestamp = this.safeInteger (trade, 'trade_timestamp');
+        const marketId = this.safeString (trade, 'code');
+        const marketResolved: Market = this.safeMarket (marketId, market);
+        // price and volume describe the fill when state is trade
+        const price = this.safeString (trade, 'price');
+        const amount = this.safeString (trade, 'volume');
+        let cost: Str = undefined;
+        if ((price !== undefined) && (amount !== undefined)) {
+            cost = Precise.stringMul (price, amount);
+        }
+        let takerOrMaker: Str = undefined;
+        const isMaker = this.safeBool (trade, 'is_maker');
+        if (isMaker !== undefined) {
+            takerOrMaker = isMaker ? 'maker' : 'taker';
+        }
+        let fee: FeeString = undefined;
+        const feeCost = this.safeString (trade, 'trade_fee');
+        if (feeCost !== undefined) {
+            fee = {
+                'currency': marketResolved['quote'],
+                'cost': feeCost,
+            };
+        }
+        return this.safeTrade ({
+            'id': this.safeString (trade, 'trade_uuid'),
+            'timestamp': timestamp,
+            'datetime': this.iso8601 (timestamp),
+            'symbol': marketResolved['symbol'],
+            'side': side,
+            'price': price,
+            'amount': amount,
+            'cost': cost,
+            'order': this.safeString (trade, 'uuid'),
+            'takerOrMaker': takerOrMaker,
+            'type': this.safeString (trade, 'order_type'),
+            'fee': fee,
+            'info': trade,
+        }, marketResolved);
+    }
+
+    handleMyOrder (client: Client, message: Dict) {
+        // see: parseWsOrder
+        const tradeId = this.safeString (message, 'trade_uuid');
+        if (tradeId !== undefined) {
+            this.handleMyTrade (client, message);
+        }
+        this.handleOrder (client, message);
+    }
+
+    handleMyTrade (client: Client, message: Dict) {
+        // see: parseWsOrder
+        if (this.myTrades === undefined) {
+            const limit = this.safeInteger (this.options, 'tradesLimit', 1000);
+            this.myTrades = new ArrayCacheBySymbolById (limit);
+        }
+        const myTrades = this.myTrades;
+        const trade = this.parseWsTrade (message);
+        myTrades.append (trade);
+        const messageHash = 'myTrades';
+        client.resolve (myTrades, messageHash);
+        client.resolve (myTrades, 'myTrades:' + this.safeString (trade, 'symbol', ''));
+    }
+
+    handleOrder (client: Client, message: Dict) {
+        const parsed = this.parseWsOrder (message);
+        const symbol = this.safeString (parsed, 'symbol');
+        const orderId = this.safeString (parsed, 'id');
+        if (this.orders === undefined) {
+            const limit = this.safeInteger (this.options, 'ordersLimit', 1000);
+            this.orders = new ArrayCacheBySymbolById (limit);
+        }
+        const cachedOrders = this.orders;
+        const orders = (symbol === undefined) ? {} : this.safeDict (cachedOrders.hashmap, symbol, {});
+        const order = (orderId === undefined) ? undefined : this.safeDict (orders, orderId);
+        if (order !== undefined) {
+            // paid_fee is cumulative, so the cached fee is only a fallback
+            const parsedFee = this.safeDict (parsed, 'fee');
+            if (parsedFee === undefined) {
+                const fee = this.safeValue (order, 'fee');
+                if (fee !== undefined) {
+                    parsed['fee'] = fee;
+                }
+                const fees = this.safeList (order, 'fees');
+                if (fees !== undefined) {
+                    parsed['fees'] = fees;
+                }
+            }
+            parsed['trades'] = this.safeValue (order, 'trades');
+            const lastTradeTimestamp = this.safeInteger (parsed, 'lastTradeTimestamp');
+            if (lastTradeTimestamp === undefined) {
+                parsed['lastTradeTimestamp'] = this.safeInteger (order, 'lastTradeTimestamp');
+            }
+            const timestamp = this.safeInteger (parsed, 'timestamp');
+            if (timestamp === undefined) {
+                parsed['timestamp'] = this.safeInteger (order, 'timestamp');
+                parsed['datetime'] = this.safeString (order, 'datetime');
+            }
+            // fill updates carry the fill price and volume instead of the order's
+            const rawStatus = this.safeString (message, 'state');
+            if (rawStatus === 'trade') {
+                const cachedPrice = this.safeNumber (order, 'price');
+                if (cachedPrice !== undefined) {
+                    parsed['price'] = cachedPrice;
+                }
+                const cachedAmount = this.safeNumber (order, 'amount');
+                if (cachedAmount !== undefined) {
+                    parsed['amount'] = cachedAmount;
+                }
+            }
+        }
+        cachedOrders.append (parsed);
+        const messageHash = 'myOrder';
+        client.resolve (this.orders, messageHash);
+        client.resolve (this.orders, messageHash + ':' + this.safeString (parsed, 'symbol', ''));
+    }
+
+    /**
+     * @method
+     * @name upbit#watchBalance
+     * @see https://global-docs.upbit.com/reference/websocket-myasset
+     * @description query for balance and get the amount of funds available for trading or funds locked in orders
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a [balance structure]{@link https://docs.ccxt.com/?id=balance-structure}
+     */
+    override async watchBalance (params: Dict = {}): Promise<Balances> {
+        if (this.markets === undefined) {
+            await this.loadMarkets ();
+        }
+        const channel = 'myAsset';
+        const messageHash = 'myAsset';
+        return await this.watchPrivate (undefined, channel, messageHash);
+    }
+
+    handleBalance (client: Client, message: Dict) {
+        //
+        // {
+        //     "type": "myAsset",
+        //     "asset_uuid": "e635f223-1609-4969-8fb6-4376937baad6",
+        //     "assets": [
+        //       {
+        //         "currency": "SGD",
+        //         "balance": 1386929.37231066771348207123,
+        //         "locked": 10329.670127489597585685
+        //       }
+        //     ],
+        //     "asset_timestamp": 1710146517259,
+        //     "timestamp": 1710146517267,
+        //     "stream_type": "REALTIME"
+        // }
+        //
+        const data: Dict[] = this.safeList (message, 'assets', []);
+        const timestamp = this.safeInteger (message, 'timestamp');
+        this.balance['timestamp'] = timestamp;
+        this.balance['datetime'] = this.iso8601 (timestamp);
+        for (let i = 0; i < data.length; i++) {
+            const balance = this.safeDict (data, i);
+            const currencyId = this.safeString (balance, 'currency');
+            const code = this.safeCurrencyCode (currencyId);
+            const available = this.safeString (balance, 'balance');
+            const frozen = this.safeString (balance, 'locked');
+            const account = this.account ();
+            account['free'] = available;
+            account['used'] = frozen;
+            if (code !== undefined) {
+                this.balance[code] = account;
+            }
+            this.balance = this.safeBalance (this.balance);
+        }
+        const messageHash = this.safeString (message, 'type');
+        client.resolve (this.balance, messageHash);
+    }
+
+    override handleMessage (client: Client, message: Dict) {
+        const methods: Dict = {
+            'ticker': this.handleTicker,
+            'orderbook': this.handleOrderBook,
+            'trade': this.handleTrades,
+            'myOrder': this.handleMyOrder,
+            'myAsset': this.handleBalance,
+            'candle.1s': this.handleOHLCV,
+        };
+        const methodName = this.safeString (message, 'type');
+        const method = this.safeValue (methods, methodName);
+        if (method !== undefined) {
+            method.call (this, client, message);
+        }
+    }
+}

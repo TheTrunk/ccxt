@@ -1,0 +1,308 @@
+package ccxt
+
+import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"mime/multipart"
+	"net/http"
+	"sort"
+	"strings"
+)
+
+// mockBodyForUrl picks the response-test body whose url fragment the request url
+// contains. Map iteration is unordered, so the no-match fallback sorts the
+// fragments and takes the first for a deterministic result.
+func mockBodyForUrl(responsesByUrl any, url any) any {
+	byUrl, ok := responsesByUrl.(map[string]any)
+	if !ok {
+		return responsesByUrl
+	}
+	urlStr, _ := url.(string)
+	fragments := make([]string, 0, len(byUrl))
+	for fragment := range byUrl {
+		fragments = append(fragments, fragment)
+	}
+	sort.Strings(fragments)
+	for _, fragment := range fragments {
+		if strings.Contains(urlStr, fragment) {
+			return byUrl[fragment]
+		}
+	}
+	if len(fragments) > 0 {
+		return byUrl[fragments[0]]
+	}
+	return nil
+}
+
+func (this *BaseExchange) FetchAsync(url any, method any, headers any, body any) chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any])
+	go func() {
+		defer close(ch)
+		defer ReturnPanicError(ch)
+
+		if this.FetchResponseByUrl != nil {
+			ch <- AsyncResult[any]{Value: mockBodyForUrl(this.FetchResponseByUrl, url)}
+			return
+		}
+
+		if this.FetchResponse != nil {
+			ch <- AsyncResult[any]{Value: this.FetchResponse}
+			return
+		}
+		this.UpdateProxySettings() // for now this needs to be here
+		// sign() may return a typed nil pointer (*string) as body; unwrap it, otherwise `body != nil` is true and a literal "null" body is sent (rejected with 403 by cloudfront on GET)
+		body = derefScalar(body)
+
+		// Convert url to string
+		urlStr, ok := url.(string)
+		if !ok {
+			panic("url must be a string")
+		}
+
+		// Convert method to string
+		methodStr, ok := method.(string)
+		if !ok {
+			panic("method must be a string")
+		}
+
+		// Convert headers to map[string]string
+		// unsigned requests carry no headers (sign returns undefined)
+		headersStrMap := make(map[string]string)
+		switch h := headers.(type) {
+		case nil:
+		case map[string]any:
+			for k, v := range h {
+				headersStrMap[k] = fmt.Sprintf("%v", v)
+			}
+		case map[string]string:
+			for k, v := range h {
+				headersStrMap[k] = v
+			}
+		default:
+			panic("headers must be a map[string]any")
+		}
+
+		headersOptions, ok := this.Options["headers"]
+		if ok {
+			if headersOptions != nil {
+				for key, value := range headersOptions.(map[string]any) {
+					if _, exists := headersStrMap[key]; !exists {
+						headersStrMap[key] = fmt.Sprintf("%v", value)
+					}
+				}
+			} else {
+				panic("headersOptions should be a map[string]any")
+			}
+
+		}
+
+		// check content type for multipart/form-data, used in lighter
+		for k, v := range headersStrMap {
+			lk := strings.ToLower(k)
+			if lk == "content-type" {
+				if v == "multipart/form-data" {
+					var formBody bytes.Buffer
+					writer := multipart.NewWriter(&formBody)
+
+					for fk, fv := range body.(map[string]any) {
+						writer.WriteField(fk, fmt.Sprintf("%v", fv))
+					}
+
+					headersStrMap[k] = writer.FormDataContentType()
+					writer.Close()
+					body = formBody.String()
+				}
+				break
+			}
+			headersStrMap[k] = fmt.Sprintf("%v", v)
+		}
+
+		// Marshal the body to JSON if not nil
+		// var requestBody []byte
+		// var err error
+		// if body != nil {
+		// 	requestBody, err = json.Marshal(body)
+		// 	if err != nil {
+		// 		panic(fmt.Sprintf("failed to marshal body: %v", err))
+		// 	}
+		// }
+
+		var req *http.Request
+		var err error
+
+		if body != nil {
+			switch v := body.(type) {
+			case string:
+				// If the body is a string, use URL encoding
+				// data := urlLib.Values{}
+				// parsedData, err := urlLib.ParseQuery(v)
+				// if err != nil {
+				// 	panic(fmt.Sprintf("error parsing query string: %w", v))
+				// }
+				// for key, values := range parsedData {
+				// 	for _, value := range values {
+				// 		data.Set(key, value)
+				// 	}
+				// }
+				req, err = http.NewRequest(methodStr, urlStr, strings.NewReader(v))
+				if err != nil {
+					panic("error creating request")
+				}
+			default:
+				requestBody, err := json.Marshal(body)
+				if err != nil {
+					panic("error marshalling JSON")
+				}
+				req, err = http.NewRequest(methodStr, urlStr, bytes.NewBuffer(requestBody))
+				if err != nil {
+					panic("error creating request")
+				}
+			}
+		} else {
+			req, err = http.NewRequest(methodStr, urlStr, nil)
+			if err != nil {
+				panic("error creating request")
+			}
+		}
+		// Create the HTTP request
+		// req, err := http.NewRequest(methodStr, urlStr, bytes.NewBuffer(requestBody))
+		// if err != nil {
+		// 	panic(fmt.Sprintf("failed to create request: %v", err))
+		// }
+
+		//set default headers
+		defaultHeaders := this.Headers.(map[string]any)
+		for key, value := range defaultHeaders {
+			req.Header.Set(key, derefScalar(value).(string))
+		}
+
+		// Set headers
+		for key, value := range headersStrMap {
+			req.Header.Set(key, value)
+		}
+
+		if this.Verbose {
+			fmt.Println("Headers:", req.Header)
+			fmt.Printf("\n\n\n")
+			fmt.Printf("Request: %s %s\n", methodStr, urlStr)
+			fmt.Printf("\n\n\n")
+			fmt.Printf("Body: %v\n", body)
+			fmt.Printf("\n\n\n")
+		}
+
+		// strings.NewReader()
+		// Send the request
+		resp, err := this.httpClient.Do(req)
+
+		// Read the response body
+		// respBody, err := ioutil.ReadAll(resp.Body)
+		var respBody []byte
+
+		if resp == nil {
+			// when resp is nil: The request failed at the transport level (e.g., network issue, DNS lookup failure).
+			networkError := NetworkError(fmt.Sprintf("Network error: %v", err))
+			panic(networkError)
+		}
+		respHeadersMap := HeaderToMap(resp.Header)
+		// hand the response headers to the request book's owner; the request
+		// goroutine never writes the shared bookkeeping fields
+		this.handOffRequestBook(requestBookOp{kind: requestBookResponse, headers: respHeadersMap})
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.Header.Get("Content-Encoding") == "gzip" {
+				gzipReader, err := gzip.NewReader(resp.Body)
+				if err != nil {
+					panic(fmt.Sprintf("Error creating gzip reader: %s", err))
+				}
+				defer gzipReader.Close()
+
+				decompressedData, err := io.ReadAll(gzipReader)
+				if err != nil {
+					panic(fmt.Sprintf("Error reading decompressed data: %s", err))
+				}
+				respBody = decompressedData
+			} else {
+				respBodyAux, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					panic(fmt.Sprintf("failed to read response body: %v", err))
+				}
+				respBody = respBodyAux
+			}
+		}
+
+		responseHeaders := HeaderToMap(resp.Header)
+
+		// Use ParseJSON to handle JSON parsing with proper number normalization
+		var result any
+		result = ParseJSON(string(respBody))
+
+		if result == nil {
+			// If ParseJSON failed, fallback to raw string
+			result = string(respBody)
+		} else {
+			if this.ReturnResponseHeaders {
+				if resultMap, ok := result.(map[string]any); ok {
+					resultMap["responseHeaders"] = responseHeaders
+					result = resultMap
+				}
+			}
+		}
+
+		// Log the response (for debugging purposes)
+		if this.Verbose {
+			fmt.Printf("Response: %s\n", respBody)
+		}
+
+		statusText := http.StatusText(resp.StatusCode)
+		// handleErrorResult := <-this.callInternal("handleErrors", resp.StatusCode, statusText, urlStr, methodStr, headers, string(respBody), result, headersStrMap, body)
+		handleErrorResult := this.DerivedExchange.HandleErrors(int64(resp.StatusCode), statusText, urlStr, methodStr, responseHeaders, string(respBody), result, headersStrMap, body)
+		PanicOnError(handleErrorResult)
+
+		if handleErrorResult == nil {
+			this.HandleHttpStatusCode(resp.StatusCode, statusText, urlStr, methodStr, result)
+		}
+
+		// Check for HTTP errors
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			// add handle http status()
+			panic(fmt.Sprintf("HTTP request failed with status code %d: %s", resp.StatusCode, string(respBody)))
+		}
+
+		// only handling failure here
+		if err != nil {
+			panic(fmt.Sprintf("request failed: %v", err))
+		}
+
+		ch <- AsyncResult[any]{Value: result}
+	}()
+	return ch
+}
+
+func (this *BaseExchange) HandleHttpStatusCode(code any, reason any, url any, method any, body any) {
+
+	codeString := ToString(code)
+	codeinHttpExceptions := SafeValue(this.HttpExceptions, codeString, nil)
+
+	if codeinHttpExceptions != nil {
+		errorMessage := this.Id + " " + ToString(method) + " " + ToString(url) + " " + ToString(code) + " " + ToString(reason) + " " + ToString(body)
+		functionError := codeinHttpExceptions.(func(...any) error)
+		panic(functionError(errorMessage))
+	}
+
+}
+
+func HeaderToMap(header http.Header) map[string]any {
+	result := make(map[string]any)
+	for key, values := range header {
+		if len(values) == 1 {
+			result[key] = values[0]
+		} else {
+			result[key] = values
+		}
+	}
+	return result
+}

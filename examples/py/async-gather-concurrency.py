@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 
@@ -13,10 +17,7 @@ import ccxt.async_support as ccxt  # noqa: E402
 async def work(exchange_id):
 
     # create it once per program lifetime
-    exchange = getattr(ccxt, exchange_id)({
-        # https://github.com/ccxt/ccxt/wiki/Manual#rate-limit
-        'enableRateLimit': True
-    })
+    exchange = getattr(ccxt, exchange_id)()
 
     print(exchange_id, 'loaded')
 
@@ -55,24 +56,23 @@ async def work(exchange_id):
     await exchange.close()
 
 
-async def main(loop):
+async def main():
 
     # https://stackoverflow.com/questions/48483348/limited-concurrency-with-asyncio
     max_concurrency = 5  # how many exchanges at once
 
     tasks = set()
-
+    loop = asyncio.get_running_loop()
     # loop over all exchanges
     for exchange_id in ccxt.exchanges:
 
         # wait for some exchange to finish before adding a new one
         if len(tasks) >= max_concurrency:
             _done, tasks = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-        tasks.add(loop.create_task(work(exchange_id)))
+        tasks.add(asyncio.create_task(work(exchange_id)))
 
     # wait for the remaining exchanges to finish
     await asyncio.wait(tasks)
 
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(main(loop))
+run(main())

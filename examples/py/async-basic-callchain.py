@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 
@@ -16,7 +19,6 @@ async def run_all_exchanges(exchange_ids):
     for exchange_id in exchange_ids:
 
         exchange = getattr(ccxt, exchange_id)({
-            'enableRateLimit': True,  # required accoding to the Manual
             'options': {
                 'useWebapiForFetchingFees': False,
             }
@@ -72,7 +74,7 @@ async def fetch_orderbook(exchange, symbol):
 
 
 if __name__ == '__main__':
-    exchange_ids = ['bitfinex', 'okex', 'exmo']
+    exchange_ids = ['bitfinex', 'okx', 'exmo']
     exchanges = []
-    results = asyncio.get_event_loop().run_until_complete(run_all_exchanges(exchange_ids))
+    results = run(run_all_exchanges(exchange_ids))
     print([(exchange_id, ticker) for exchange_id, ticker in results.items()])

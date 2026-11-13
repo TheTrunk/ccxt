@@ -4,74 +4,109 @@
 //      npm run vss
 // ---------------------------------------------------------------------------
 
-"use strict";
+import fs from 'fs'
+import log from 'ololog'
+import ansi from 'ansicolor'
+import { copyFile } from './fsLocal.js'
+import { pathToFileURL } from 'url'
+import { URL } from 'url'
+import { join } from 'path'
+import { platform } from 'process'
 
-const fs           = require ('fs')
-const log          = require ('ololog')
-const ansi         = require ('ansicolor').nice
-const { execSync } = require ('child_process')
+ansi.nice
 
-//-----------------------------------------------------------------------------
+let __dirname = new URL('.', import.meta.url).pathname;
 
-function incrementVersionPatchNumber (version) {
-
-    let [ major, minor, patch ] = version.split ('.')
-
-    // we don't increment it here anymore, because
-    // npm version patch will be explicitly called before
-
-    // patch = (parseInt (patch) + 1).toString ()
-
-    version = [ major, minor, patch ].join ('.')
-
-    return version
+// this is necessary because for some reason
+// pathname keeps the first '/' for windows paths
+// making them invalid
+// example: /C:Users/user/Desktop/
+if (platform === 'win32') {
+    if (__dirname[0] === '/') {
+        __dirname = __dirname.substring(1)
+    }
 }
 
 //-----------------------------------------------------------------------------
 
-function vss (filename, template, version) {
+function vss (filename, template, version, global = false) {
+    const flag = global ? 'g' : ''
     log.bright.cyan ('Single-sourcing version', version, './package.json → ' + filename.yellow)
     const content = fs.readFileSync (filename, 'utf8')
     const regexp  = new RegExp (template.replace (/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') // escape string for use in regexp
-                                        .replace ('\\{version\\}', '\\d+\\.\\d+\\.\\d+'), 'g')
+                                        .replace ('\\{version\\}', '\\d+\\.\\d+\\.\\d+'), flag)
     fs.truncateSync  (filename)
     fs.writeFileSync (filename, content.replace (regexp, template.replace ('{version}', version)))
 }
 
 // ----------------------------------------------------------------------------
 
-function vssEverything () {
+async function vssEverything () {
+    const packageJSON = JSON.parse (fs.readFileSync (join(__dirname, '..', 'package.json')))
+    const version = packageJSON['version']
 
-    let { version } = require ('../package.json')
-
-    log.bright ('Old version: '.dim, version)
-    version = incrementVersionPatchNumber (version)
     log.bright ('New version: '.cyan, version)
 
-    vss ('./ccxt.js',                                    "const version = '{version}'", version)
-    vss ('./php/base/Exchange.php',                      "$version = '{version}'",      version)
-    vss ('./php/base/Exchange.php',                      "VERSION = '{version}'",       version)
-    vss ('./python/ccxt/__init__.py',                    "__version__ = '{version}'",   version)
-    vss ('./python/ccxt/base/exchange.py',               "__version__ = '{version}'",   version)
-    vss ('./python/ccxt/async_support/__init__.py',      "__version__ = '{version}'",   version)
-    vss ('./python/ccxt/async_support/base/exchange.py', "__version__ = '{version}'",   version)
+    vss ('./ts/ccxt.ts',                                 "const version = '{version}'",                                                 version)
+    vss ('./ts/src/base/Exchange.ts',                    "static ccxtVersion = '{version}'",                                            version)
+    vss ('./dist/ccxt.browser.js',                       "const version = '{version}'",                                                 version)
+    vss ('./dist/ccxt.browser.min.js',                   "const ps=\"{version}\"",                                                      version)
+    vss ('./dist/cjs/ccxt.js',                           "const version = '{version}'",                                                 version)
+    vss ('./php/Exchange.php',                           "$version = '{version}'",                                                      version)
+    vss ('./php/Exchange.php',                           "public static $ccxt_version = '{version}'",                                   version)
+    vss ('./php/async/Exchange.php',                     "VERSION = '{version}'",                                                       version)
+    vss ('./php/async/Exchange.php',                     "$version = '{version}'",                                                      version)
+    vss ('./php/Exchange.php',                           "VERSION = '{version}'",                                                       version)
+    vss ('./pyproject.toml',                             "version = \"{version}\"",                                                   version)
+    vss ('./python/ccxt/__init__.py',                    "__version__ = '{version}'",                                                   version)
+    vss ('./python/ccxt/base/exchange.py',               "__version__ = '{version}'",                                                   version)
+    vss ('./python/ccxt/async_support/__init__.py',      "__version__ = '{version}'",                                                   version)
+    vss ('./python/ccxt/async_support/base/exchange.py', "__version__ = '{version}'",                                                   version)
+    vss ('./python/ccxt/pro/__init__.py',                "__version__ = '{version}'",                                                   version)
+    vss ('./python/ccxt/prediction/__init__.py',         "__version__ = '{version}'",                                                   version)
+    vss ('./cs/ccxt/base/Exchange.MetaData.cs',          "public static string ccxtVersion = \"{version}\";",                           version)
+    vss ('./cs/ccxt/ccxt.csproj',                         "<PackageVersion>{version}</PackageVersion>",                                 version)
+    vss ('./cs/ccxt/ccxt.csproj',                         "<AssemblyVersion>{version}</AssemblyVersion>",                               version)
+    vss ('./cs/ccxt/ccxt.csproj',                         "<FileVersion>{version}</FileVersion>",                                       version)
+    vss ('./go/v4/exchange_metadata.go',                 "var Version string = \"{version}\"",                                          version)
+    vss ('./go/v4/pro/exchange_metadata.go',                 "var Version string = \"{version}\"",                                      version)
+    vss ('./go/v4/prediction/exchange_metadata.go',          "var Version string = \"{version}\"",                                      version)
+    vss ('./java/lib/src/main/java/io/github/ccxt/Version.java', "public static final String VERSION = \"{version}\";",                 version)
+    vss ('./java/gradle.properties',                          "version={version}",                                                      version)
 
-    vss ('./README.md',       "ccxt@{version}", version)
-    vss ('./wiki/Install.md', "ccxt@{version}", version)
+    // Rust crates. The package version is the FIRST `version = "x.y.z"` in each
+    // manifest (it sits in [package]), and the inter-crate path dependencies
+    // carry a version too — cargo publish rejects a path dependency without
+    // one, so these must move together or a release goes out pinned to the
+    // previous version.
+    vss ('./rust/ccxt-common/Cargo.toml',       'version = "{version}"',                                        version)
+    vss ('./rust/ccxt-base/Cargo.toml',       'version = "{version}"',                                        version)
+    vss ('./rust/ccxt/Cargo.toml',            'version = "{version}"',                                        version)
+    vss ('./rust/ccxt-pro/Cargo.toml',        'version = "{version}"',                                        version)
+    vss ('./rust/ccxt-prediction/Cargo.toml', 'version = "{version}"',                                        version)
+    vss ('./rust/ccxt-base/Cargo.toml',       'path = "../ccxt-common", version = "{version}"',                 version)
+    vss ('./rust/ccxt/Cargo.toml',            'path = "../ccxt-base", version = "{version}"',                 version)
+    vss ('./rust/ccxt-pro/Cargo.toml',        'path = "../ccxt-base", version = "{version}"',                 version)
+    vss ('./rust/ccxt-prediction/Cargo.toml', 'path = "../ccxt-base", version = "{version}"',                 version)
 
-    execSync ('cp ./package.json ./LICENSE.txt ./keys.json ./python/')
+    // vss ('./python/ccxt/pro/base/exchange.py',           "__version__ = '{version}'",   version)
+
+    vss ('./README.md',       "ccxt@{version}", version, true)
+    vss ('./wiki/Install.md', "ccxt@{version}", version, true)
 
     log.bright.green ('Version single-sourced successfully.')
 }
 
 // ============================================================================
 // main entry point
-
-if (require.main === module) {
+let metaUrl = import.meta.url
+metaUrl = metaUrl.substring(0, metaUrl.lastIndexOf(".")) // remove extension
+const url = pathToFileURL(process.argv[1]);
+const href = (url.href.indexOf('.') !== -1) ? url.href.substring(0, url.href.lastIndexOf(".")) : url.href;
+if (metaUrl === href) {
 
     // if called directly like `node module`
-
-    vssEverything ()
+    await vssEverything ()
 
 } else {
 
@@ -80,8 +115,7 @@ if (require.main === module) {
 
 // ============================================================================
 
-module.exports = {
-    incrementVersionPatchNumber,
+export {
     vss,
     vssEverything,
 }

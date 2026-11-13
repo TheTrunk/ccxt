@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 
@@ -12,12 +15,12 @@ import ccxt.async_support as ccxt  # noqa: E402
 
 async def test():
     bitfinex = ccxt.bitfinex({
-        'apiKey': "4FlEDtxDl35gdEiobnfZ72vJeZteE4Bb7JdvqzjIjHq",
-        'secret': "D4DXM8DZdHuAq9YptUsb42aWT1XBnGlIJgLi8a7tzFH",
+        'apiKey': "YOUR_API_KEY",
+        'secret': "YOUR_SECRET",
         'verbose': True,  # switch it to False if you don't want the HTTP log
     })
     print(await bitfinex.public_get_symbols())
     await bitfinex.close()
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(test())
+
+run(test())

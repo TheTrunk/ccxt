@@ -1,0 +1,1213 @@
+---
+name: ccxt-go
+description: CCXT cryptocurrency exchange library for Go developers. Covers both REST API (standard) and WebSocket API (real-time). Helps install CCXT, connect to exchanges, fetch market data, place orders, stream live tickers/orderbooks, handle authentication, and manage errors in Go projects. Use when working with crypto exchanges in Go applications, microservices, or trading systems.
+---
+
+# CCXT for Go
+
+A comprehensive guide to using CCXT in Go projects for cryptocurrency exchange integration.
+
+## Installation
+
+### REST API
+```bash
+go get github.com/ccxt/ccxt/go/v4
+```
+
+### WebSocket API (ccxt.pro)
+```bash
+go get github.com/ccxt/ccxt/go/v4/pro
+```
+
+## Quick Start
+
+### REST API
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/ccxt/ccxt/go/v4/binance"
+)
+
+func main() {
+    exchange := binance.New()
+    markets, err := exchange.LoadMarkets()
+    if err != nil {
+        panic(err)
+    }
+
+    ticker, err := exchange.FetchTicker("BTC/USDT")
+    if err != nil {
+        panic(err)
+    }
+
+    fmt.Println(ticker)
+}
+```
+
+### WebSocket API - Real-time Updates
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/ccxt/ccxt/go/v4/pro/binance"
+)
+
+func main() {
+    exchange := binance.New()
+    defer exchange.Close()
+
+    for {
+        ticker, err := exchange.WatchTicker("BTC/USDT")
+        if err != nil {
+            panic(err)
+        }
+        fmt.Println(ticker.Last)  // Live updates!
+    }
+}
+```
+
+## REST vs WebSocket
+
+| Feature | REST API | WebSocket API |
+|---------|----------|---------------|
+| **Use for** | One-time queries, placing orders | Real-time monitoring, live price feeds |
+| **Import** | `github.com/ccxt/ccxt/go/v4/{exchange}` | `github.com/ccxt/ccxt/go/v4/pro/{exchange}` |
+| **Methods** | `Fetch*` (FetchTicker, FetchOrderBook) | `Watch*` (WatchTicker, WatchOrderBook) |
+| **Speed** | Slower (HTTP request/response) | Faster (persistent connection) |
+| **Rate limits** | Strict (1-2 req/sec) | More lenient (continuous stream) |
+| **Best for** | Trading, account management | Price monitoring, arbitrage detection |
+
+**Important:** All methods return `(result, error)` - always check errors!
+
+## Creating Exchange Instance
+
+### REST API
+```go
+import "github.com/ccxt/ccxt/go/v4/binance"
+
+// Public API (no authentication)
+exchange := binance.New()
+exchange.EnableRateLimit = true  // Recommended!
+
+// Private API (with authentication)
+exchange := binance.New()
+exchange.ApiKey = "YOUR_API_KEY"
+exchange.Secret = "YOUR_SECRET"
+exchange.EnableRateLimit = true
+```
+
+### WebSocket API
+```go
+import "github.com/ccxt/ccxt/go/v4/pro/binance"
+
+// Public WebSocket
+exchange := binance.New()
+defer exchange.Close()
+
+// Private WebSocket (with authentication)
+exchange := binance.New()
+exchange.ApiKey = "YOUR_API_KEY"
+exchange.Secret = "YOUR_SECRET"
+defer exchange.Close()
+```
+
+## Common REST Operations
+
+### Loading Markets
+```go
+// Load all available trading pairs
+markets, err := exchange.LoadMarkets()
+if err != nil {
+    panic(err)
+}
+
+// Access market information
+btcMarket := exchange.Market("BTC/USDT")
+fmt.Println(btcMarket.Limits.Amount.Min)  // Minimum order amount
+```
+
+### Fetching Ticker
+```go
+// Single ticker
+ticker, err := exchange.FetchTicker("BTC/USDT")
+if err != nil {
+    panic(err)
+}
+fmt.Println(ticker.Last)      // Last price
+fmt.Println(ticker.Bid)       // Best bid
+fmt.Println(ticker.Ask)       // Best ask
+fmt.Println(ticker.Volume)    // 24h volume
+
+// Multiple tickers (if supported)
+tickers, err := exchange.FetchTickers([]string{"BTC/USDT", "ETH/USDT"})
+```
+
+### Fetching Order Book
+```go
+// Full orderbook
+orderbook, err := exchange.FetchOrderBook("BTC/USDT", nil)
+if err != nil {
+    panic(err)
+}
+fmt.Println(orderbook.Bids[0])  // [price, amount]
+fmt.Println(orderbook.Asks[0])  // [price, amount]
+
+// Limited depth
+limit := 5
+orderbook, err := exchange.FetchOrderBook("BTC/USDT", &limit)
+```
+
+### Creating Orders
+
+#### Limit Order
+```go
+// Buy limit order
+order, err := exchange.CreateLimitBuyOrder("BTC/USDT", 0.01, 50000, nil)
+if err != nil {
+    panic(err)
+}
+fmt.Println(order.Id)
+
+// Sell limit order
+order, err := exchange.CreateLimitSellOrder("BTC/USDT", 0.01, 60000, nil)
+
+// Generic limit order
+order, err := exchange.CreateOrder("BTC/USDT", "limit", "buy", 0.01, 50000, nil)
+```
+
+#### Market Order
+```go
+// Buy market order
+order, err := exchange.CreateMarketBuyOrder("BTC/USDT", 0.01, nil)
+
+// Sell market order
+order, err := exchange.CreateMarketSellOrder("BTC/USDT", 0.01, nil)
+
+// Generic market order
+order, err := exchange.CreateOrder("BTC/USDT", "market", "sell", 0.01, nil, nil)
+```
+
+### Fetching Balance
+```go
+balance, err := exchange.FetchBalance()
+if err != nil {
+    panic(err)
+}
+fmt.Println(balance["BTC"].Free)   // Available balance
+fmt.Println(balance["BTC"].Used)   // Balance in orders
+fmt.Println(balance["BTC"].Total)  // Total balance
+```
+
+### Fetching Orders
+```go
+// Open orders
+openOrders, err := exchange.FetchOpenOrders("BTC/USDT", nil, nil, nil)
+
+// Closed orders
+closedOrders, err := exchange.FetchClosedOrders("BTC/USDT", nil, nil, nil)
+
+// All orders (open + closed)
+allOrders, err := exchange.FetchOrders("BTC/USDT", nil, nil, nil)
+
+// Single order by ID
+order, err := exchange.FetchOrder(orderId, "BTC/USDT", nil)
+```
+
+### Fetching Trades
+```go
+// Recent public trades
+limit := 10
+trades, err := exchange.FetchTrades("BTC/USDT", nil, &limit, nil)
+
+// Your trades (requires authentication)
+myTrades, err := exchange.FetchMyTrades("BTC/USDT", nil, nil, nil)
+```
+
+### Canceling Orders
+```go
+// Cancel single order
+err := exchange.CancelOrder(orderId, "BTC/USDT", nil)
+
+// Cancel all orders for a symbol
+err := exchange.CancelAllOrders("BTC/USDT", nil)
+```
+
+## WebSocket Operations (Real-time)
+
+### Watching Ticker (Live Price Updates)
+```go
+import "github.com/ccxt/ccxt/go/v4/pro/binance"
+
+exchange := binance.New()
+defer exchange.Close()
+
+for {
+    ticker, err := exchange.WatchTicker("BTC/USDT")
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(ticker.Last, ticker.Timestamp)
+}
+```
+
+### Watching Order Book (Live Depth Updates)
+```go
+exchange := binance.New()
+defer exchange.Close()
+
+for {
+    orderbook, err := exchange.WatchOrderBook("BTC/USDT", nil)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println("Best bid:", orderbook.Bids[0])
+    fmt.Println("Best ask:", orderbook.Asks[0])
+}
+```
+
+### Watching Trades (Live Trade Stream)
+```go
+exchange := binance.New()
+defer exchange.Close()
+
+for {
+    trades, err := exchange.WatchTrades("BTC/USDT", nil, nil, nil)
+    if err != nil {
+        panic(err)
+    }
+    for _, trade := range trades {
+        fmt.Println(trade.Price, trade.Amount, trade.Side)
+    }
+}
+```
+
+### Watching Your Orders (Live Order Updates)
+```go
+exchange := binance.New()
+exchange.ApiKey = "YOUR_API_KEY"
+exchange.Secret = "YOUR_SECRET"
+defer exchange.Close()
+
+for {
+    orders, err := exchange.WatchOrders("BTC/USDT", nil, nil, nil)
+    if err != nil {
+        panic(err)
+    }
+    for _, order := range orders {
+        fmt.Println(order.Id, order.Status, order.Filled)
+    }
+}
+```
+
+### Watching Balance (Live Balance Updates)
+```go
+exchange := binance.New()
+exchange.ApiKey = "YOUR_API_KEY"
+exchange.Secret = "YOUR_SECRET"
+defer exchange.Close()
+
+for {
+    balance, err := exchange.WatchBalance()
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println("BTC:", balance["BTC"])
+    fmt.Println("USDT:", balance["USDT"])
+}
+```
+
+## Complete Method Reference
+
+### Market Data Methods
+
+#### Tickers & Prices
+- `fetchTicker(symbol)` - Fetch ticker for one symbol
+- `fetchTickers([symbols])` - Fetch multiple tickers at once
+- `fetchBidsAsks([symbols])` - Fetch best bid/ask for multiple symbols
+- `fetchLastPrices([symbols])` - Fetch last prices
+- `fetchMarkPrices([symbols])` - Fetch mark prices (derivatives)
+
+#### Order Books
+- `fetchOrderBook(symbol, limit)` - Fetch order book
+- `fetchOrderBooks([symbols])` - Fetch multiple order books
+- `fetchL2OrderBook(symbol)` - Fetch level 2 order book
+- `fetchL3OrderBook(symbol)` - Fetch level 3 order book (if supported)
+
+#### Trades
+- `fetchTrades(symbol, since, limit)` - Fetch public trades
+- `fetchMyTrades(symbol, since, limit)` - Fetch your trades (auth required)
+- `fetchOrderTrades(orderId, symbol)` - Fetch trades for specific order
+
+#### OHLCV (Candlesticks)
+- `fetchOHLCV(symbol, timeframe, since, limit)` - Fetch candlestick data
+- `fetchIndexOHLCV(symbol, timeframe)` - Fetch index price OHLCV
+- `fetchMarkOHLCV(symbol, timeframe)` - Fetch mark price OHLCV
+- `fetchPremiumIndexOHLCV(symbol, timeframe)` - Fetch premium index OHLCV
+
+### Account & Balance
+
+- `fetchBalance()` - Fetch account balance (auth required)
+- `fetchAccounts()` - Fetch sub-accounts
+- `fetchLedger(code, since, limit)` - Fetch ledger history
+- `fetchLedgerEntry(id, code)` - Fetch specific ledger entry
+- `fetchTransactions(code, since, limit)` - Fetch transactions
+- `fetchDeposits(code, since, limit)` - Fetch deposit history
+- `fetchWithdrawals(code, since, limit)` - Fetch withdrawal history
+- `fetchDepositsWithdrawals(code, since, limit)` - Fetch both deposits and withdrawals
+
+### Trading Methods
+
+#### Creating Orders
+- `createOrder(symbol, type, side, amount, price, params)` - Create order (generic)
+- `createLimitOrder(symbol, side, amount, price)` - Create limit order
+- `createMarketOrder(symbol, side, amount)` - Create market order
+- `createLimitBuyOrder(symbol, amount, price)` - Buy limit order
+- `createLimitSellOrder(symbol, amount, price)` - Sell limit order
+- `createMarketBuyOrder(symbol, amount)` - Buy market order
+- `createMarketSellOrder(symbol, amount)` - Sell market order
+- `createMarketBuyOrderWithCost(symbol, cost)` - Buy with specific cost
+- `createStopLimitOrder(symbol, side, amount, price, stopPrice)` - Stop-limit order
+- `createStopMarketOrder(symbol, side, amount, stopPrice)` - Stop-market order
+- `createStopLossOrder(symbol, side, amount, stopPrice)` - Stop-loss order
+- `createTakeProfitOrder(symbol, side, amount, takeProfitPrice)` - Take-profit order
+- `createTrailingAmountOrder(symbol, side, amount, trailingAmount)` - Trailing stop
+- `createTrailingPercentOrder(symbol, side, amount, trailingPercent)` - Trailing stop %
+- `createTriggerOrder(symbol, side, amount, triggerPrice)` - Trigger order
+- `createPostOnlyOrder(symbol, side, amount, price)` - Post-only order
+- `createReduceOnlyOrder(symbol, side, amount, price)` - Reduce-only order
+- `createOrders([orders])` - Create multiple orders at once
+- `createOrderWithTakeProfitAndStopLoss(symbol, type, side, amount, price, tpPrice, slPrice)` - OCO order
+
+#### Managing Orders
+- `fetchOrder(orderId, symbol)` - Fetch single order
+- `fetchOrders(symbol, since, limit)` - Fetch all orders
+- `fetchOpenOrders(symbol, since, limit)` - Fetch open orders
+- `fetchClosedOrders(symbol, since, limit)` - Fetch closed orders
+- `fetchCanceledOrders(symbol, since, limit)` - Fetch canceled orders
+- `fetchOpenOrder(orderId, symbol)` - Fetch specific open order
+- `fetchOrdersByStatus(status, symbol)` - Fetch orders by status
+- `cancelOrder(orderId, symbol)` - Cancel single order
+- `cancelOrders([orderIds], symbol)` - Cancel multiple orders
+- `cancelAllOrders(symbol)` - Cancel all orders for symbol
+- `editOrder(orderId, symbol, type, side, amount, price)` - Modify order
+
+### Margin & Leverage
+
+- `fetchBorrowRate(code)` - Fetch borrow rate for margin
+- `fetchBorrowRates([codes])` - Fetch multiple borrow rates
+- `fetchBorrowRateHistory(code, since, limit)` - Historical borrow rates
+- `fetchCrossBorrowRate(code)` - Cross margin borrow rate
+- `fetchIsolatedBorrowRate(symbol, code)` - Isolated margin borrow rate
+- `borrowMargin(code, amount, symbol)` - Borrow margin
+- `repayMargin(code, amount, symbol)` - Repay margin
+- `fetchLeverage(symbol)` - Fetch leverage
+- `setLeverage(leverage, symbol)` - Set leverage
+- `fetchLeverageTiers(symbols)` - Fetch leverage tiers
+- `fetchMarketLeverageTiers(symbol)` - Leverage tiers for market
+- `setMarginMode(marginMode, symbol)` - Set margin mode (cross/isolated)
+- `fetchMarginMode(symbol)` - Fetch margin mode
+
+### Derivatives & Futures
+
+#### Positions
+- `fetchPosition(symbol)` - Fetch single position
+- `fetchPositions([symbols])` - Fetch all positions
+- `fetchPositionsForSymbol(symbol)` - Fetch positions for symbol
+- `fetchPositionHistory(symbol, since, limit)` - Position history
+- `fetchPositionsHistory(symbols, since, limit)` - Multiple position history
+- `fetchPositionMode(symbol)` - Fetch position mode (one-way/hedge)
+- `setPositionMode(hedged, symbol)` - Set position mode
+- `closePosition(symbol, side)` - Close position
+- `closeAllPositions()` - Close all positions
+
+#### Funding & Settlement
+- `fetchFundingRate(symbol)` - Current funding rate
+- `fetchFundingRates([symbols])` - Multiple funding rates
+- `fetchFundingRateHistory(symbol, since, limit)` - Funding rate history
+- `fetchFundingHistory(symbol, since, limit)` - Your funding payments
+- `fetchFundingInterval(symbol)` - Funding interval
+- `fetchSettlementHistory(symbol, since, limit)` - Settlement history
+- `fetchMySettlementHistory(symbol, since, limit)` - Your settlement history
+
+#### Open Interest & Liquidations
+- `fetchOpenInterest(symbol)` - Open interest for symbol
+- `fetchOpenInterests([symbols])` - Multiple open interests
+- `fetchOpenInterestHistory(symbol, timeframe, since, limit)` - OI history
+- `fetchLiquidations(symbol, since, limit)` - Public liquidations
+- `fetchMyLiquidations(symbol, since, limit)` - Your liquidations
+
+#### Options
+- `fetchOption(symbol)` - Fetch option info
+- `fetchOptionChain(code)` - Fetch option chain
+- `fetchGreeks(symbol)` - Fetch option greeks
+- `fetchVolatilityHistory(code, since, limit)` - Volatility history
+- `fetchUnderlyingAssets()` - Fetch underlying assets
+
+### Fees & Limits
+
+- `fetchTradingFee(symbol)` - Trading fee for symbol
+- `fetchTradingFees([symbols])` - Trading fees for multiple symbols
+- `fetchTradingLimits([symbols])` - Trading limits
+- `fetchTransactionFee(code)` - Transaction/withdrawal fee
+- `fetchTransactionFees([codes])` - Multiple transaction fees
+- `fetchDepositWithdrawFee(code)` - Deposit/withdrawal fee
+- `fetchDepositWithdrawFees([codes])` - Multiple deposit/withdraw fees
+
+### Deposits & Withdrawals
+
+- `fetchDepositAddress(code, params)` - Get deposit address
+- `fetchDepositAddresses([codes])` - Multiple deposit addresses
+- `fetchDepositAddressesByNetwork(code)` - Addresses by network
+- `createDepositAddress(code, params)` - Create new deposit address
+- `fetchDeposit(id, code)` - Fetch single deposit
+- `fetchWithdrawal(id, code)` - Fetch single withdrawal
+- `fetchWithdrawAddresses(code)` - Fetch withdrawal addresses
+- `fetchWithdrawalWhitelist(code)` - Fetch whitelist
+- `withdraw(code, amount, address, tag, params)` - Withdraw funds
+- `deposit(code, amount, params)` - Deposit funds (if supported)
+
+### Transfer & Convert
+
+- `transfer(code, amount, fromAccount, toAccount)` - Internal transfer
+- `fetchTransfer(id, code)` - Fetch transfer info
+- `fetchTransfers(code, since, limit)` - Fetch transfer history
+- `fetchConvertCurrencies()` - Currencies available for convert
+- `fetchConvertQuote(fromCode, toCode, amount)` - Get conversion quote
+- `createConvertTrade(fromCode, toCode, amount)` - Execute conversion
+- `fetchConvertTrade(id)` - Fetch convert trade
+- `fetchConvertTradeHistory(code, since, limit)` - Convert history
+
+### Market Info
+
+- `fetchMarkets()` - Fetch all markets
+- `fetchCurrencies()` - Fetch all currencies
+- `fetchTime()` - Fetch exchange server time
+- `fetchStatus()` - Fetch exchange status
+- `fetchBorrowInterest(code, symbol, since, limit)` - Borrow interest paid
+- `fetchLongShortRatio(symbol, timeframe, since, limit)` - Long/short ratio
+- `fetchLongShortRatioHistory(symbol, timeframe, since, limit)` - L/S ratio history
+
+### WebSocket Methods (ccxt.pro)
+
+All REST methods have WebSocket equivalents with `watch*` prefix:
+
+#### Real-time Market Data
+- `watchTicker(symbol)` - Watch single ticker
+- `watchTickers([symbols])` - Watch multiple tickers
+- `watchOrderBook(symbol)` - Watch order book updates
+- `watchOrderBookForSymbols([symbols])` - Watch multiple order books
+- `watchTrades(symbol)` - Watch public trades
+- `watchOHLCV(symbol, timeframe)` - Watch candlestick updates
+- `watchBidsAsks([symbols])` - Watch best bid/ask
+
+#### Real-time Account Data (Auth Required)
+- `watchBalance()` - Watch balance updates
+- `watchOrders(symbol)` - Watch your order updates
+- `watchMyTrades(symbol)` - Watch your trade updates
+- `watchPositions([symbols])` - Watch position updates
+- `watchPositionsForSymbol(symbol)` - Watch positions for symbol
+
+### Authentication Required
+
+Methods marked with 🔒 require API credentials:
+
+- All `create*` methods (creating orders, addresses)
+- All `cancel*` methods (canceling orders)
+- All `edit*` methods (modifying orders)
+- All `fetchMy*` methods (your trades, orders)
+- `fetchBalance`, `fetchLedger`, `fetchAccounts`
+- `withdraw`, `transfer`, `deposit`
+- Margin/leverage methods
+- Position methods
+- `watchBalance`, `watchOrders`, `watchMyTrades`, `watchPositions`
+
+### Checking Method Availability
+
+Not all exchanges support all methods. Check before using:
+
+```
+// Check if method is supported
+if (exchange.has['fetchOHLCV']) {
+    const candles = await exchange.fetchOHLCV('BTC/USDT', '1h')
+}
+
+// Check multiple capabilities
+console.log(exchange.has)
+// {
+//   fetchTicker: true,
+//   fetchOHLCV: true,
+//   fetchMyTrades: true,
+//   fetchPositions: false,
+//   ...
+// }
+```
+
+### Method Naming Convention
+
+- `fetch*` - REST API methods (HTTP requests)
+- `watch*` - WebSocket methods (real-time streams)
+- `create*` - Create new resources (orders, addresses)
+- `cancel*` - Cancel existing resources
+- `edit*` - Modify existing resources
+- `set*` - Configure settings (leverage, margin mode)
+- `*Ws` suffix - WebSocket variant (some exchanges)
+
+
+
+## Proxy Configuration
+
+CCXT supports HTTP, HTTPS, and SOCKS proxies for both REST and WebSocket connections.
+
+### Setting Proxy
+
+```
+// HTTP Proxy
+exchange.httpProxy = 'http://your-proxy-host:port'
+
+// HTTPS Proxy  
+exchange.httpsProxy = 'https://your-proxy-host:port'
+
+// SOCKS Proxy
+exchange.socksProxy = 'socks://your-proxy-host:port'
+
+// Proxy with authentication
+exchange.httpProxy = 'http://user:pass@proxy-host:port'
+```
+
+### Proxy for WebSocket
+
+WebSocket connections also respect proxy settings:
+
+```
+exchange.httpsProxy = 'https://proxy:8080'
+// WebSocket connections will use this proxy
+```
+
+### Testing Proxy Connection
+
+```
+exchange.httpProxy = 'http://localhost:8080'
+try {
+    await exchange.fetchTicker('BTC/USDT')
+    console.log('Proxy working!')
+} catch (error) {
+    console.error('Proxy connection failed:', error)
+}
+```
+
+## WebSocket-Specific Methods
+
+Some exchanges provide WebSocket variants of REST methods for faster order placement and management. These use the `*Ws` suffix:
+
+### Trading via WebSocket
+
+**Creating Orders:**
+- `createOrderWs` - Create order via WebSocket (faster than REST)
+- `createLimitOrderWs` - Create limit order via WebSocket
+- `createMarketOrderWs` - Create market order via WebSocket
+- `createLimitBuyOrderWs` - Buy limit order via WebSocket
+- `createLimitSellOrderWs` - Sell limit order via WebSocket
+- `createMarketBuyOrderWs` - Buy market order via WebSocket
+- `createMarketSellOrderWs` - Sell market order via WebSocket
+- `createStopLimitOrderWs` - Stop-limit order via WebSocket
+- `createStopMarketOrderWs` - Stop-market order via WebSocket
+- `createStopLossOrderWs` - Stop-loss order via WebSocket
+- `createTakeProfitOrderWs` - Take-profit order via WebSocket
+- `createTrailingAmountOrderWs` - Trailing stop via WebSocket
+- `createTrailingPercentOrderWs` - Trailing stop % via WebSocket
+- `createPostOnlyOrderWs` - Post-only order via WebSocket
+- `createReduceOnlyOrderWs` - Reduce-only order via WebSocket
+
+**Managing Orders:**
+- `editOrderWs` - Edit order via WebSocket
+- `cancelOrderWs` - Cancel order via WebSocket (faster than REST)
+- `cancelOrdersWs` - Cancel multiple orders via WebSocket
+- `cancelAllOrdersWs` - Cancel all orders via WebSocket
+
+**Fetching Data:**
+- `fetchOrderWs` - Fetch order via WebSocket
+- `fetchOrdersWs` - Fetch orders via WebSocket
+- `fetchOpenOrdersWs` - Fetch open orders via WebSocket
+- `fetchClosedOrdersWs` - Fetch closed orders via WebSocket
+- `fetchMyTradesWs` - Fetch your trades via WebSocket
+- `fetchBalanceWs` - Fetch balance via WebSocket
+- `fetchPositionWs` - Fetch position via WebSocket
+- `fetchPositionsWs` - Fetch positions via WebSocket
+- `fetchPositionsForSymbolWs` - Fetch positions for symbol via WebSocket
+- `fetchTradingFeesWs` - Fetch trading fees via WebSocket
+
+### When to Use WebSocket Methods
+
+**Use `*Ws` methods when:**
+- You need faster order placement (lower latency)
+- You're already connected via WebSocket
+- You want to reduce REST API rate limit usage
+- Trading strategies require sub-100ms latency
+
+**Use REST methods when:**
+- You need guaranteed execution confirmation
+- You're making one-off requests
+- The exchange doesn't support the WebSocket variant
+- You need detailed error responses
+
+### Example: Order Placement Comparison
+
+**REST API (slower, more reliable):**
+```
+const order = await exchange.createOrder('BTC/USDT', 'limit', 'buy', 0.01, 50000)
+```
+
+**WebSocket API (faster, lower latency):**
+```
+const order = await exchange.createOrderWs('BTC/USDT', 'limit', 'buy', 0.01, 50000)
+```
+
+### Checking WebSocket Method Availability
+
+Not all exchanges support WebSocket trading methods:
+
+```
+if (exchange.has['createOrderWs']) {
+    // Exchange supports WebSocket order creation
+    const order = await exchange.createOrderWs('BTC/USDT', 'limit', 'buy', 0.01, 50000)
+} else {
+    // Fall back to REST
+    const order = await exchange.createOrder('BTC/USDT', 'limit', 'buy', 0.01, 50000)
+}
+```
+
+
+## Authentication
+
+### Setting API Keys
+
+```go
+import "os"
+
+// During instantiation
+exchange := binance.New()
+exchange.ApiKey = os.Getenv("BINANCE_API_KEY")
+exchange.Secret = os.Getenv("BINANCE_SECRET")
+exchange.EnableRateLimit = true
+```
+
+### Testing Authentication
+```go
+balance, err := exchange.FetchBalance()
+if err != nil {
+    if _, ok := err.(*ccxt.AuthenticationError); ok {
+        fmt.Println("Invalid API credentials")
+    } else {
+        panic(err)
+    }
+} else {
+    fmt.Println("Authentication successful!")
+}
+```
+
+## Error Handling
+
+### Error Types
+```
+BaseError
+├─ NetworkError (recoverable - retry)
+│  ├─ RequestTimeout
+│  ├─ ExchangeNotAvailable
+│  ├─ RateLimitExceeded
+│  └─ DDoSProtection
+└─ ExchangeError (non-recoverable - don't retry)
+   ├─ AuthenticationError
+   ├─ InsufficientFunds
+   ├─ InvalidOrder
+   └─ NotSupported
+```
+
+### Basic Error Handling
+```go
+import "github.com/ccxt/ccxt/go/v4/ccxt"
+
+ticker, err := exchange.FetchTicker("BTC/USDT")
+if err != nil {
+    switch e := err.(type) {
+    case *ccxt.NetworkError:
+        fmt.Println("Network error - retry:", e.Message)
+    case *ccxt.ExchangeError:
+        fmt.Println("Exchange error - do not retry:", e.Message)
+    default:
+        fmt.Println("Unknown error:", err)
+    }
+}
+```
+
+### Specific Error Handling
+```go
+order, err := exchange.CreateOrder("BTC/USDT", "limit", "buy", 0.01, 50000, nil)
+if err != nil {
+    switch err.(type) {
+    case *ccxt.InsufficientFunds:
+        fmt.Println("Not enough balance")
+    case *ccxt.InvalidOrder:
+        fmt.Println("Invalid order parameters")
+    case *ccxt.RateLimitExceeded:
+        fmt.Println("Rate limit hit - wait before retrying")
+        time.Sleep(1 * time.Second)
+    case *ccxt.AuthenticationError:
+        fmt.Println("Check your API credentials")
+    default:
+        panic(err)
+    }
+}
+```
+
+### Retry Logic for Network Errors
+```go
+import "time"
+
+func fetchWithRetry(exchange *binance.Exchange, maxRetries int) (*ccxt.Ticker, error) {
+    for i := 0; i < maxRetries; i++ {
+        ticker, err := exchange.FetchTicker("BTC/USDT")
+        if err == nil {
+            return ticker, nil
+        }
+
+        if _, ok := err.(*ccxt.NetworkError); ok && i < maxRetries-1 {
+            fmt.Printf("Retry %d/%d\n", i+1, maxRetries)
+            time.Sleep(time.Duration(i+1) * time.Second)  // Exponential backoff
+        } else {
+            return nil, err
+        }
+    }
+    return nil, fmt.Errorf("all retries failed")
+}
+```
+
+## Rate Limiting
+
+### Built-in Rate Limiter (Recommended)
+```go
+exchange := binance.New()
+exchange.EnableRateLimit = true  // Automatically throttles requests
+```
+
+### Manual Delays
+```go
+import "time"
+
+exchange.FetchTicker("BTC/USDT")
+time.Sleep(time.Duration(exchange.RateLimit) * time.Millisecond)
+exchange.FetchTicker("ETH/USDT")
+```
+
+### Checking Rate Limit
+```go
+fmt.Println(exchange.RateLimit)  // Milliseconds between requests
+```
+
+## Common Pitfalls
+
+### Not Checking Error Returns
+```go
+// Wrong - ignores errors
+ticker, _ := exchange.FetchTicker("BTC/USDT")
+fmt.Println(ticker.Last)  // May panic if ticker is nil!
+
+// Correct - check errors
+ticker, err := exchange.FetchTicker("BTC/USDT")
+if err != nil {
+    panic(err)
+}
+fmt.Println(ticker.Last)
+```
+
+### Wrong Import Path
+```go
+// Wrong - missing /v4
+import "github.com/ccxt/ccxt/go/binance"  // ERROR!
+
+// Correct - must include /v4
+import "github.com/ccxt/ccxt/go/v4/binance"
+
+// Correct - WebSocket with /v4/pro
+import "github.com/ccxt/ccxt/go/v4/pro/binance"
+```
+
+### Using REST for Real-time Monitoring
+```go
+// Wrong - wastes rate limits
+for {
+    ticker, _ := exchange.FetchTicker("BTC/USDT")  // REST
+    fmt.Println(ticker.Last)
+    time.Sleep(1 * time.Second)
+}
+
+// Correct - use WebSocket
+import "github.com/ccxt/ccxt/go/v4/pro/binance"
+
+exchange := binance.New()
+defer exchange.Close()
+
+for {
+    ticker, err := exchange.WatchTicker("BTC/USDT")  // WebSocket
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(ticker.Last)
+}
+```
+
+### Not Closing WebSocket Connections
+```go
+// Wrong - memory leak
+exchange := binance.New()
+ticker, _ := exchange.WatchTicker("BTC/USDT")
+// Forgot to close!
+
+// Correct - always defer Close()
+exchange := binance.New()
+defer exchange.Close()
+
+for {
+    ticker, err := exchange.WatchTicker("BTC/USDT")
+    if err != nil {
+        break
+    }
+    fmt.Println(ticker.Last)
+}
+```
+
+### Incorrect Symbol Format
+```go
+// Wrong symbol formats
+"BTCUSDT"    // Wrong - no separator
+"BTC-USDT"   // Wrong - dash separator
+"btc/usdt"   // Wrong - lowercase
+
+// Correct symbol format
+"BTC/USDT"   // Unified CCXT format
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**1. "package github.com/ccxt/ccxt/go/v4/binance: cannot find package"**
+- Solution: Run `go get github.com/ccxt/ccxt/go/v4`
+
+**2. "RateLimitExceeded"**
+- Solution: Set `exchange.EnableRateLimit = true`
+
+**3. "AuthenticationError"**
+- Solution: Check API key and secret
+- Verify API key permissions on exchange
+- Check system clock is synced
+
+**4. "InvalidNonce"**
+- Solution: Sync system clock
+- Use only one exchange instance per API key
+
+**5. "InsufficientFunds"**
+- Solution: Check available balance (`balance["BTC"].Free`)
+- Account for trading fees
+
+**6. "ExchangeNotAvailable"**
+- Solution: Check exchange status/maintenance
+- Retry after a delay
+
+### Debugging
+
+```go
+// Enable verbose logging
+exchange.Verbose = true
+
+// Check exchange capabilities
+fmt.Println(exchange.Has)
+// map[string]bool{
+//   "fetchTicker": true,
+//   "fetchOrderBook": true,
+//   "createOrder": true,
+//   ...
+// }
+
+// Check market information
+market := exchange.Markets["BTC/USDT"]
+fmt.Println(market)
+
+// Check last request/response
+fmt.Println(exchange.LastHttpResponse)
+fmt.Println(exchange.LastJsonResponse)
+```
+
+## Prediction Markets
+
+CCXT supports prediction-market exchanges (Polymarket, Kalshi, Limitless, Myriad, Hyperliquid) in a dedicated `go/v4/prediction` package. They use the same unified API, but prices are quoted **0–1** (USDC per outcome share) and the tradeable unit is an **outcome** (e.g. a market's YES/NO token), not a regular market symbol.
+
+```go
+import (
+    ccxt "github.com/ccxt/ccxt/go/v4"
+    ccxtprediction "github.com/ccxt/ccxt/go/v4/prediction"
+)
+
+ex := ccxtprediction.NewPolymarket(map[string]interface{}{})
+ex.LoadMarkets() // outcomes load automatically (outcome handle, outcomeId, market, label)
+// an outcome handle looks like 'TRUMP_OUT_PRESIDENT_2027:YES'
+handle := "TRUMP_OUT_PRESIDENT_2027:YES"
+ticker, _ := ex.FetchTicker(handle)
+book, _ := ex.FetchOrderBook(handle)
+// limit buy 5 YES shares @ 0.40 USDC (price is 0..1 per share)
+order, err := ex.CreateOrder(handle, "limit", "buy", 5, ccxt.WithCreateOrderPrice(0.40))
+if err == nil {
+    ex.CancelOrder(*order.Id, ccxtprediction.WithCancelOrderOutcome(handle))
+}
+```
+
+- Price/trade methods (`FetchTicker`, `FetchOrderBook`, `FetchOHLCV`, `FetchTrades`, `CreateOrder`, `CancelOrder`, …) take an **outcome handle or outcomeId** — passed positionally or via the `With…Outcome` / `With…Outcomes` option, not a market symbol.
+- Discover markets via `FetchEvents` / `FetchEvent` (or `LoadMarkets`).
+
+## Order Router
+
+Two things, either usable without the other. **A client** for the CCXT order-router service — a
+separate process holding live books across many venues, which answers "what is the cheapest way to
+turn asset A into asset B right now?", including bridges (`SOL -> USDT -> BTC` when no `SOL/BTC`
+market exists). And **an execution engine for plans you build yourself**, which needs no router
+service and no API key. It is **not** an exchange: it does not embed `Exchange`, has no unified
+methods, and is constructed directly.
+
+```go
+router, err := ccxt.NewOrderRouter(nil)
+if err != nil {
+    log.Fatal(err)
+}
+
+// exactly one of amountIn / amountOut
+route, err := router.FetchRoute("USDT", "BTC", map[string]any{"amountIn": 1000.0})
+
+// Execute takes the route directly: it builds the plan, loads each venue's markets and
+// runs the safety check itself, refusing to place anything on a blocking violation
+venues := map[string]ccxt.IExchange{"binance": binance, "kraken": kraken}
+report, err := router.Execute(route, venues, map[string]any{
+    "strategy":  "sequential",
+    "usdRates":  map[string]any{"USDT": 1.0},
+})
+// want to see or change the plan first? the steps in between are public and PURE (no I/O):
+// BuildExecutionPlan(route, nil) then CheckExecutionPlanSafety(plan, markets, nil)
+```
+
+Go note: the typed `Order` carries a single `Fee` and no `Fees` list, so on a venue that reports
+only per-trade fees this port under-counts the fee netted out of what is carried forward — the
+conservative direction, never an over-count.
+
+`execute` defaults to `dry_run`, and **anything other than an explicit live flag forces `dry_run`
+regardless of the strategy requested** — a call that looks live but forgot the flag places nothing.
+
+### The service, and what it costs
+
+`https://docs.ccxt.com/router/api`. **Every endpoint is public**: there is no API key, no signup
+and no login. The service rate-limits by client IP address instead.
+
+The client still accepts an `apiKey` and still sends it as `x-api-key` when you pass one, so a
+deployment that fronts the service with its own authentication keeps working. With no key the
+header is omitted entirely rather than sent empty.
+
+**The full contract is published as OpenAPI 3.1 at `https://docs.ccxt.com/router/openapi.yaml`.**
+`curl -O https://docs.ccxt.com/router/openapi.yaml` and point codegen at it, import it into
+Postman/Insomnia, or diff it between deploys. It is the authority on every field this client
+reads; where the two disagree, the spec is right. Rendered prose version:
+[/router/docs](https://docs.ccxt.com/router/docs) and
+[/router/docs/api](https://docs.ccxt.com/router/docs/api).
+
+**Free to use for now, up to the published rate limit** — not a permanent commitment, so expect a
+paid tier eventually. Your existing key is how that would be billed; nothing in the client changes.
+Read the limit off the response headers (`x-ratelimit-limit`, `x-ratelimit-remaining`,
+`x-ratelimit-reset`) rather than hardcoding a number. A `429` raises `RateLimitExceeded` with the
+retry interval folded into the message.
+
+A router that has restarted is alive long before it can price anything. Asked to route in that
+window it refuses with `503 cache_cold`, and the client raises **`ExchangeNotAvailable`** — a
+retry, distinct from the `ExchangeError` that means something is actually wrong.
+
+**Holdings are POSTed, never put in a URL.** `FetchRoute` normally sends a `GET`, but when you pass
+`balances` the client switches to `POST /route` and puts every parameter in the body: the service
+scrubs holdings from its own logs, but a reverse proxy, an ALB, a CDN, browser history and a
+`Referer` all see the full request line, and no in-process redaction reaches them.
+`FetchRouteWithBalances` does this for you.
+
+
+**Two flags the client verifies for you**, because one silently lost in transit looks identical to
+one never sent. `balances`: the service ignores them entirely if it predates the feature and
+answers byte-identically, so `FetchRoute` throws unless the router echoes `balancesApplied` (or
+`balanceEntryCount`, which is how an *empty* wallet is confirmed) — pass `requireBalancesApplied:
+false` to opt out. `requireFullFill`: the one flag that fails *open*, so the client stamps what you
+asked for and the safety check makes `partial_fill` **blocking** when you asked for a full fill and
+did not get one.
+
+**An empty value is not an omitted one.** Omit `bridges` and you get the default bridge set; send
+`bridges=` and you have asked for no bridging at all. Same for `exchanges=` (no venues) and
+`balances=` (you hold nothing). The client forwards an empty value rather than dropping it.
+
+**`requestId`** is sent as the `x-request-id` header, so your log and the router's decision log can
+be joined; the service mints one when absent.
+
+### Asking the service about itself
+
+| Method | Endpoint | Key? | Answers |
+|---|---|---|---|
+| `FetchHealth()` | `/health` | no | is the process alive — `200` from the first millisecond of boot |
+| `FetchReadiness()` | `/ready` | no | can it route yet: book counts, and how many are fresh |
+| `FetchVersion()` | `/version` | yes | which commit is deployed |
+| `FetchSymbols()` | `/symbols` | yes | the symbols it holds a book for |
+| `FetchExchangesStatus()` | `/exchanges/status` | yes | per-venue connection health |
+| `FetchCachedOrderBook(exchangeId, symbol)` | `/orderbook/{exchange}/{symbol}` | yes | the exact book a route was ranked on |
+
+Gate deploys on readiness, not health — `/health` is `200` before a single websocket has connected.
+`FetchReadiness()` does **not** raise when the answer is no: the service replies `503` carrying the same
+body it returns on `200`, and you need those counts to know why.
+
+```go
+readiness, err := router.FetchReadiness()
+if err == nil && readiness["status"] != "ready" {
+    fmt.Println(readiness["freshCount"], "of", readiness["bookCount"], "books are fresh")
+}
+```
+
+`/metrics` (Prometheus) has no client method — it answers `text/plain` and this class parses every
+response as JSON.
+
+**Watching a route.** `WatchRoute` holds a WebSocket open and calls your hook with each RouteResult as
+the books move; return `'stop'` to close cleanly and get the last route back. Every frame is
+stamped exactly as `FetchRoute` stamps its answer, so it can go straight into the plan builder. Three
+endpoint rules differ from `FetchRoute`: `balances` and `balanceMode` are **refused** (a socket outlives
+the holdings it was opened with — refused client-side, before anything opens), `includeQuotes`
+defaults to **false**, and refusals arrive as close codes rather than statuses — `1008` raises
+`BadRequest` and `1013` raises `ExchangeNotAvailable`, the same classes the REST path uses. A hook
+that throws stops the stream and reaches you, unlike execute's step hook.
+
+### Watching a run, and stopping it
+
+`execute` is not opaque. `options.onStep` is called after each step completes AND after its
+reconciliation — never mid-order — and its return value decides whether the route continues.
+
+```go
+report, err := router.Execute(plan, venues, map[string]any{
+    "strategy": "sequential",
+    "retryFailedSteps": 2, // only a DEFINITIVELY REJECTED step is retried
+    "onStep": func(event map[string]any) string {
+        if event["status"] == "partial" { return "halt" } // "halt" stops the route
+        return ""
+    },
+})
+```
+
+The event is a plain dictionary: `planId`, `stepIndex`, `hopIndex`, `legIndex`, `exchangeId`,
+`symbol`, `side`, `status`, `requestedAmount`, `filledAmount`, `outAsset`, `outAmount`, `orderId`,
+`clientOrderId`, `errorCode`, `attempt`, `reconciliation`, `ordersPlaced`, `halted`, `haltReason`,
+`stepsTotal`, `stepsRemaining`.
+
+- **It can only narrow.** `'halt'` stops the route and sets `haltReason` to `halted_by_on_step`;
+  nothing it returns resumes a route the reconciliation already halted.
+- It is called on the halt paths too, with an empty `reconciliation`, so it always learns how the
+  route ended.
+- **Do no network I/O in it** — it sits between orders on the money path.
+- A hook that throws is recorded in `report['errors']` as `on_step_hook_failed` and the run
+  continues; losing the report would destroy the only account of orders already live.
+
+For decisions that need I/O, slice the plan and call `execute` per hop with its own
+`idempotencyKey` instead.
+
+`options.retryFailedSteps` (default 0, `retryDelayMs` default 1000) re-places a step the venue
+**definitively rejected**. An `outcome_unknown` step is never retried at any setting: it may
+already be a live position, and re-placing it is the double-fill this class exists to prevent. The
+winning attempt is reported as `attempt`. The router sets no client order id of its own — venues
+disagree on length and charset, so whatever you pass in `orderParams` travels untouched.
+
+### Executing your own plans
+
+`execute` takes a **plan**, not a route, and never checks where the plan came from — so your own
+strategy can supply its own trades and still get the notional cap, halt-and-reconcile between hops,
+resting-order cleanup and the unwind plan. A plan that has been through JSON or a database, or a
+hand-rebuilt tail of a halted route, is equally valid.
+
+A step is one order on one venue. Required: `exchangeId`, `symbol`, `side`, `amount`, `base`,
+`quote`. Optional: `stepIndex` (defaults to position), `hopIndex`/`legIndex` (steps sharing a
+`hopIndex` are one hop — what `parallel_within_hop` parallelises), `expectedPrice`, `limitPrice`,
+`notionalQuote`.
+
+```go
+plan := map[string]any{
+    "requestId":    "my-strategy-0001", // identity; a live run refuses without one
+    "calculatedAt": exchange.Milliseconds(),
+    "steps": []any{
+        map[string]any{
+            "exchangeId": "binance", "symbol": "BTC/USDT", "side": "buy",
+            "amount": 0.01, "base": "BTC", "quote": "USDT",
+            "hopIndex": 0, "expectedPrice": 64000,
+        },
+    },
+}
+report, err := router.Execute(plan, venues, map[string]any{
+    "strategy": "sequential", "maxNotionalUsd": 25,
+})
+```
+
+A live `execute` requires an identity and refuses without one: the identity is remembered in-process
+so a second `execute` of the same plan is refused before any venue is contacted. Supply it as the
+plan's `requestId` or as the options' `idempotencyKey`. `execute` never sets a `clientOrderId` of its
+own: each exchange's `CreateOrder` keeps sending whatever identifier it generates internally, and a
+`clientOrderId` you put in the options' `orderParams` travels untouched (to every step alike).
+
+Make it stable and tied to the intent (a strategy name plus the signal's timestamp). A fresh value
+per call — a wall-clock timestamp and friends — turns the guard off while looking like it is on. To
+re-run deliberately, pass `allowReexecution`. The guard does not survive a restart.
+
+`checkExecutionPlanSafety` is worth running on a hand-written plan first: it checks every step
+against that venue's real market rules — minimum amount, minimum cost, precision — which is where a
+hand-picked amount usually goes wrong.
+
+
+Strategies: `dry_run` (default), `sequential`, `parallel_within_hop` (concurrent across venues,
+serialised within a venue), `limit_protected` (rests a limit order and cancels it at
+`orderTimeoutMs`, polling every `pollIntervalMs`), `atomic_ish` (requires the route pre-funded),
+`best_effort` (single-hop, never halts).
+
+Every report carries `planAgeMs` — how old the plan's prices were when `execute` was called (`-1`
+when the route carried no `calculatedAt`, which means unknown, not fresh). Pass
+`options.maxPlanAgeMs` to refuse a live execution of a plan older than that; there is no default
+limit, and under an active limit a plan whose age cannot be determined is refused too.
+
+There is **no notional cap by default** — trade cents or trade thousands. `maxNotionalUsd` is an
+opt-in guardrail: pass it to the constructor, or per call in the options, and it is honoured
+exactly at whatever value you choose, in either direction; omit it (or pass 0) and no notional
+check runs. Only a negative value is refused.
+
+A market order cannot be placed under a cap: the cap is checked against the plan's limit price and
+a market order carries no price at all, so asking for `allowMarketOrders` together with a cap is
+refused rather than silently unbounded.
+
+When a cap IS set it is enforced immediately before **every** order — not just at plan time,
+because a reconciliation may have resized the plan since — and a step that cannot be valued in USD
+**blocks**, so supply a USD rate for every quote asset in the plan. With no cap set there is
+nothing to evaluate and USD rates are not required either.
+
+In the report, `status: 'outcome_unknown'` means the request may or may not have reached the venue
+— execution halts rather than reconciling, because reconciling would read the fill as 0 and report
+"nothing filled", asserting the one thing nobody knows. Check the open orders and the venue before
+retrying. `placementAttempted` is false until an order was actually dispatched.
+
+`buildExecutionPlan` refuses a route that does not run from the asset you offered to the asset you
+wanted, or whose hops do not connect — the answer is checked against the client's own record of
+the question, so a compromised or buggy router response cannot steer orders into another market.
+
+Full reference: [Order Router in the CCXT Manual](https://docs.ccxt.com/#/?id=order-router).
+
+## Bitget Stock Routing
+
+Default discovery cross-references classic spot symbols against public UTA spot instruments to identify stocks; loading UTA markets is not required. `symbolType: 'stock'` sets the unified market's `stock` flag; `isReality: 'yes'` is a fallback only when `symbolType` is absent. Stock-underlying derivatives retain their derivative type and do not use Reality spot REST endpoints. Stock spot WebSocket subscriptions automatically use UTA; derivatives retain classic derivative WebSockets unless `uta: true` is selected explicitly. Symbol-required methods infer stock routing from market metadata and discard legacy `params.stock` overrides. The stock selector remains available for symbol-less discovery, tickers and balances. This does not add Stock+ securities-account support or imply share ownership.
+
+## Learn More
+
+- [CCXT Manual](https://docs.ccxt.com/)
+- [CCXT Pro Documentation](https://docs.ccxt.com/en/latest/ccxt.pro.html)
+- [Supported Exchanges](https://github.com/ccxt/ccxt#supported-cryptocurrency-exchange-markets)
+- [GitHub Repository](https://github.com/ccxt/ccxt)

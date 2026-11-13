@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 from pprint import pprint
@@ -11,14 +15,20 @@ sys.path.append(root + '/python')
 import ccxt.async_support as ccxt  # noqa: E402
 
 
-exchange_ids = [ 'binance', 'kucoin', 'huobipro' ]
+exchange_ids = [ 'binance', 'kucoin', 'htx' ]
 symbol = 'ETH/BTC'
 
 async def loop(exchange_id, symbol):
 
     exchange_class = getattr(ccxt, exchange_id)
-    exchange = exchange_class({'enableRateLimit': True})
-    orderbook = await exchange.fetch_order_book(symbol)
+    exchange = exchange_class()
+    orderbook = {}
+    try:
+        await exchange.load_markets()
+        # exchange.verbose = True  # uncomment for debugging purposes
+        orderbook = await exchange.fetch_order_book(symbol)
+    except Exception as e:
+        print(type(e).__name__, str(e))
     await exchange.close()
     return exchange.extend (orderbook, {
         'exchange_id': exchange_id,
@@ -32,7 +42,7 @@ async def run(exchange_ids, symbol):
 
 
 main = run(exchange_ids, symbol)
-results = asyncio.get_event_loop().run_until_complete(main)
+results = run(main)
 for result in results:
     bids = result['bids']
     asks = result['asks']

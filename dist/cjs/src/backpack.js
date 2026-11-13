@@ -1,0 +1,3455 @@
+'use strict';
+
+Object.defineProperty(exports, '__esModule', { value: true });
+
+var ed25519_js = require('@noble/curves/ed25519.js');
+var backpack$1 = require('./abstract/backpack.js');
+var errors = require('./base/errors.js');
+var number = require('./base/functions/number.js');
+var Precise = require('./base/Precise.js');
+var crypto = require('./base/functions/crypto.js');
+
+// ----------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+/**
+ * @class backpack
+ * @augments Exchange
+ */
+class backpack extends backpack$1["default"] {
+    describe() {
+        return this.deepExtend(super.describe(), {
+            'id': 'backpack',
+            'name': 'Backpack',
+            'countries': ['JP'], // Japan
+            'rateLimit': 50, // 20 times per second
+            'version': 'v1',
+            'certified': false,
+            'pro': true,
+            'has': {
+                'CORS': undefined,
+                'spot': true,
+                'margin': true,
+                'swap': true,
+                'future': false,
+                'option': false,
+                'addMargin': false,
+                'cancelAllOrders': true,
+                'cancelAllOrdersAfter': false,
+                'cancelOrder': true,
+                'cancelOrders': false,
+                'cancelWithdraw': false,
+                'closePosition': false,
+                'createConvertTrade': true,
+                'createDepositAddress': false,
+                'createLimitBuyOrder': true,
+                'createLimitOrder': true,
+                'createLimitSellOrder': true,
+                'createMarketBuyOrder': true,
+                'createMarketBuyOrderWithCost': true,
+                'createMarketOrder': true,
+                'createMarketOrderWithCost': true,
+                'createMarketSellOrder': true,
+                'createMarketSellOrderWithCost': true,
+                'createOrder': true,
+                'createOrders': true,
+                'createOrderWithTakeProfitAndStopLoss': true,
+                'createPostOnlyOrder': true,
+                'createReduceOnlyOrder': true,
+                'createStopLossOrder': false,
+                'createTakeProfitOrder': false,
+                'createTrailingAmountOrder': false,
+                'createTrailingPercentOrder': false,
+                'createTriggerOrder': true,
+                'fetchAccounts': false,
+                'fetchAllGreeks': false,
+                'fetchBalance': true,
+                'fetchCanceledAndClosedOrders': false,
+                'fetchCanceledOrders': false,
+                'fetchClosedOrder': false,
+                'fetchClosedOrders': false,
+                'fetchConvertCurrencies': false,
+                'fetchConvertQuote': true,
+                'fetchConvertTrade': false,
+                'fetchConvertTradeHistory': false,
+                'fetchCurrencies': true,
+                'fetchDepositAddress': true,
+                'fetchDeposits': true,
+                'fetchDepositsWithdrawals': false,
+                'fetchDepositWithdrawFees': false,
+                'fetchFundingHistory': true,
+                'fetchFundingRate': true,
+                'fetchFundingRateHistory': true,
+                'fetchFundingRates': false,
+                'fetchGreeks': false,
+                'fetchIndexOHLCV': true,
+                'fetchLedger': false,
+                'fetchLeverage': false,
+                'fetchLeverageTiers': false,
+                'fetchMarginAdjustmentHistory': false,
+                'fetchMarginMode': false,
+                'fetchMarkets': true,
+                'fetchMarkOHLCV': true,
+                'fetchMyTrades': true,
+                'fetchOHLCV': true,
+                'fetchOpenInterest': true,
+                'fetchOpenInterestHistory': true,
+                'fetchOpenOrder': true,
+                'fetchOpenOrders': true,
+                'fetchOption': false,
+                'fetchOptionChain': false,
+                'fetchOrder': 'emulated',
+                'fetchOrderBook': true,
+                'fetchOrders': true,
+                'fetchOrderTrades': false,
+                'fetchPosition': false,
+                'fetchPositionHistory': false,
+                'fetchPositionMode': false,
+                'fetchPositions': true,
+                'fetchPositionsForSymbol': false,
+                'fetchPositionsHistory': false,
+                'fetchPremiumIndexOHLCV': false,
+                'fetchStatus': true,
+                'fetchTicker': true,
+                'fetchTickers': true,
+                'fetchTime': true,
+                'fetchTrades': true,
+                'fetchTradingFee': false,
+                'fetchTradingFees': false,
+                'fetchTransactions': false,
+                'fetchTransfers': false,
+                'fetchVolatilityHistory': false,
+                'fetchWithdrawals': true,
+                'reduceMargin': false,
+                'sandbox': false,
+                'setLeverage': false,
+                'setMargin': false,
+                'setMarginMode': false,
+                'setPositionMode': false,
+                'transfer': false,
+                'withdraw': true,
+            },
+            'timeframes': {
+                '1m': '1m',
+                '3m': '3m',
+                '5m': '5m',
+                '15': '15m',
+                '30': '30m',
+                '1h': '1h',
+                '2h': '2h',
+                '4h': '4h',
+                '6h': '6h',
+                '8h': '8h',
+                '12h': '12h',
+                '1d': '1d',
+                '3d': '3d',
+                '1w': '1w',
+                '1M': '1month',
+            },
+            'urls': {
+                'logo': 'https://github.com/user-attachments/assets/7f682234-3eb1-48ab-a5ec-250a3227c985',
+                'api': {
+                    'public': 'https://api.backpack.exchange',
+                    'private': 'https://api.backpack.exchange',
+                },
+                'www': 'https://backpack.exchange/',
+                'doc': 'https://docs.backpack.exchange/',
+                'referral': 'https://backpack.exchange/join/ccxt',
+            },
+            'api': {
+                'public': {
+                    'get': {
+                        'api/v1/assets': { 'cost': 1 }, // done
+                        'api/v1/collateral': { 'cost': 1 }, // not used
+                        'api/v1/borrowLend/markets': { 'cost': 1 },
+                        'api/v1/borrowLend/markets/history': { 'cost': 1 },
+                        'api/v1/borrowLend/apy': { 'cost': 1 },
+                        'api/v1/markets': { 'cost': 1 }, // done
+                        'api/v1/market': { 'cost': 1 }, // not used
+                        'api/v1/ticker': { 'cost': 1 }, // done
+                        'api/v1/tickers': { 'cost': 1 }, // done
+                        'api/v1/depth': { 'cost': 1 }, // done
+                        'api/v1/prediction': { 'cost': 1 },
+                        'api/v1/prediction/tags': { 'cost': 1 },
+                        'api/v1/market-sessions': { 'cost': 1 },
+                        'api/v1/market-holidays': { 'cost': 1 },
+                        'api/v1/stockSessions': { 'cost': 1 },
+                        'api/v1/stockHolidays': { 'cost': 1 },
+                        'api/v1/stockIndicativeQuote': { 'cost': 1 },
+                        'api/v1/securities': { 'cost': 1 },
+                        'api/v1/klines': { 'cost': 1 }, // done
+                        'api/v1/markPrices': { 'cost': 1 }, // done
+                        'api/v1/openInterest': { 'cost': 1 }, // done
+                        'api/v1/fundingRates': { 'cost': 1 }, // done
+                        'api/v1/status': { 'cost': 1 }, // done
+                        'api/v1/ping': { 'cost': 1 }, // todo check if it is needed for ws
+                        'api/v1/time': { 'cost': 1 }, // done
+                        'api/v1/wallets': { 'cost': 1 }, // not used
+                        'api/v1/trades': { 'cost': 1 }, // done
+                        'api/v1/trades/history': { 'cost': 1 }, // done
+                    },
+                },
+                'private': {
+                    'get': {
+                        'api/v1/account': { 'cost': 1 }, // todo fetchTradingFee
+                        'api/v1/account/limits/borrow': { 'cost': 1 }, // not used
+                        'api/v1/account/limits/order': { 'cost': 1 }, // not used
+                        'api/v1/account/limits/withdrawal': { 'cost': 1 }, // not used
+                        'api/v1/borrowLend/positions': { 'cost': 1 }, // todo fetchBorrowInterest
+                        'api/v1/borrowLend/position/liquidationPrice': { 'cost': 1 },
+                        'api/v1/capital': { 'cost': 1 }, // done
+                        'api/v1/capital/collateral': { 'cost': 1 }, // not used
+                        'wapi/v1/capital/deposits': { 'cost': 1 }, // done
+                        'wapi/v1/capital/deposit/address': { 'cost': 1 }, // done
+                        'wapi/v1/capital/withdrawals': { 'cost': 1 }, // todo complete after withdrawal
+                        'api/v1/position': { 'cost': 1 }, // done but todo check if all is right
+                        'wapi/v1/history/borrowLend': { 'cost': 1 }, // not used
+                        'wapi/v1/history/interest': { 'cost': 1 }, // not used
+                        'wapi/v1/history/borrowLend/positions': { 'cost': 1 }, // not used
+                        'wapi/v1/history/dust': { 'cost': 1 }, // not used
+                        'wapi/v1/history/fills': { 'cost': 1 }, // done
+                        'wapi/v1/history/funding': { 'cost': 1 }, // done
+                        'wapi/v1/history/position': { 'cost': 1 },
+                        'wapi/v1/history/orders': { 'cost': 1 }, // done
+                        'api/v1/rfqs': { 'cost': 1 },
+                        'wapi/v1/history/rfq': { 'cost': 1 },
+                        'wapi/v1/history/quote': { 'cost': 1 },
+                        'wapi/v1/history/rfq/fill': { 'cost': 1 },
+                        'wapi/v1/history/quote/fill': { 'cost': 1 },
+                        'wapi/v1/history/settlement': { 'cost': 1 },
+                        'wapi/v1/history/strategies': { 'cost': 1 },
+                        'api/v1/strategy': { 'cost': 1 },
+                        'api/v1/strategies': { 'cost': 1 },
+                        'api/v1/order': { 'cost': 1 }, // done
+                        'api/v1/orders': { 'cost': 1 }, // done
+                    },
+                    'post': {
+                        'api/v1/account/convertDust': { 'cost': 1 },
+                        'api/v1/borrowLend': { 'cost': 1 }, // todo borrowCrossMargin
+                        'wapi/v1/capital/withdrawals': { 'cost': 1 }, // todo complete after withdrawal
+                        'api/v1/order': { 'cost': 1 }, // done
+                        'api/v1/orders': { 'cost': 1 }, // done
+                        'api/v1/rfq': { 'cost': 1 },
+                        'api/v1/rfq/accept': { 'cost': 1 },
+                        'api/v1/rfq/cancel': { 'cost': 1 },
+                        'api/v1/rfq/quote': { 'cost': 1 },
+                        'api/v1/strategy': { 'cost': 1 },
+                    },
+                    'delete': {
+                        'api/v1/order': { 'cost': 1 }, // done
+                        'api/v1/orders': { 'cost': 1 }, // done
+                        'api/v1/strategy': { 'cost': 1 },
+                        'api/v1/strategies': { 'cost': 1 },
+                    },
+                    'patch': {
+                        'api/v1/account': { 'cost': 1 },
+                    },
+                },
+            },
+            'features': {
+                'default': {
+                    'sandbox': false,
+                    'createOrder': {
+                        'marginMode': false,
+                        'triggerPrice': true,
+                        'triggerPriceType': undefined,
+                        'triggerDirection': false,
+                        'stopLossPrice': true,
+                        'takeProfitPrice': true,
+                        'attachedStopLossTakeProfit': undefined,
+                        'timeInForce': {
+                            'GTC': true,
+                            'IOC': true,
+                            'FOK': true,
+                            'PO': true,
+                            'GTD': false,
+                        },
+                        'hedged': false,
+                        'trailing': false,
+                        'leverage': false,
+                        'marketBuyByCost': true,
+                        'marketBuyRequiresPrice': true,
+                        'selfTradePrevention': {
+                            'EXPIRE_MAKER': true,
+                            'EXPIRE_TAKER': true,
+                            'EXPIRE_BOTH': true,
+                            'NONE': false,
+                        },
+                        'iceberg': false,
+                    },
+                    'createOrders': {
+                        'max': 20,
+                    },
+                    'fetchMyTrades': {
+                        'marginMode': false,
+                        'limit': 1000,
+                        'daysBack': undefined,
+                        'untilDays': undefined,
+                        'symbolRequired': false,
+                    },
+                    'fetchOrder': undefined,
+                    'fetchOpenOrders': {
+                        'marginMode': false,
+                        'limit': 1000,
+                        'trigger': true,
+                        'trailing': false,
+                        'symbolRequired': false,
+                    },
+                    'fetchOrders': {
+                        'marginMode': false,
+                        'limit': 1000,
+                        'daysBack': undefined,
+                        'untilDays': undefined,
+                        'trigger': true,
+                        'trailing': false,
+                        'symbolRequired': true,
+                    },
+                    'fetchClosedOrders': undefined,
+                    'fetchOHLCV': {
+                        'paginate': false,
+                        'limit': 1000,
+                    },
+                },
+                'spot': {
+                    'extends': 'default',
+                },
+                'swap': {
+                    'linear': undefined,
+                    'inverse': undefined,
+                },
+                'future': {
+                    'linear': undefined,
+                    'inverse': undefined,
+                },
+            },
+            'requiredCredentials': {
+                'apiKey': true,
+                'secret': true,
+            },
+            'precisionMode': number.TICK_SIZE,
+            'options': {
+                'instructions': {
+                    'api/v1/account': {
+                        'GET': 'accountQuery',
+                        'PATCH': 'accountUpdate',
+                    },
+                    'api/v1/capital': {
+                        'GET': 'balanceQuery',
+                    },
+                    'api/v1/account/limits/borrow': {
+                        'GET': 'maxBorrowQuantity',
+                    },
+                    'api/v1/account/limits/order': {
+                        'GET': 'maxOrderQuantity',
+                    },
+                    'api/v1/account/limits/withdrawal': {
+                        'GET': 'maxWithdrawalQuantity',
+                    },
+                    'api/v1/borrowLend/positions': {
+                        'GET': 'borrowLendPositionQuery',
+                    },
+                    'api/v1/borrowLend': {
+                        'POST': 'borrowLendExecute',
+                    },
+                    'wapi/v1/history/borrowLend/positions': {
+                        'GET': 'borrowPositionHistoryQueryAll',
+                    },
+                    'wapi/v1/history/borrowLend': {
+                        'GET': 'borrowHistoryQueryAll',
+                    },
+                    'wapi/v1/history/dust': {
+                        'GET': 'dustHistoryQueryAll',
+                    },
+                    'api/v1/capital/collateral': {
+                        'GET': 'collateralQuery',
+                    },
+                    'wapi/v1/capital/deposit/address': {
+                        'GET': 'depositAddressQuery',
+                    },
+                    'wapi/v1/capital/deposits': {
+                        'GET': 'depositQueryAll',
+                    },
+                    'wapi/v1/history/fills': {
+                        'GET': 'fillHistoryQueryAll',
+                    },
+                    'wapi/v1/history/funding': {
+                        'GET': 'fundingHistoryQueryAll',
+                    },
+                    'wapi/v1/history/interest': {
+                        'GET': 'interestHistoryQueryAll',
+                    },
+                    'api/v1/order': {
+                        'GET': 'orderQuery',
+                        'POST': 'orderExecute',
+                        'DELETE': 'orderCancel',
+                    },
+                    'api/v1/orders': {
+                        'GET': 'orderQueryAll',
+                        'POST': 'orderExecute',
+                        'DELETE': 'orderCancelAll',
+                    },
+                    'wapi/v1/history/orders': {
+                        'GET': 'orderHistoryQueryAll',
+                    },
+                    'wapi/v1/history/pnl': {
+                        'GET': 'pnlHistoryQueryAll',
+                    },
+                    'wapi/v1/history/rfq': {
+                        'GET': 'rfqHistoryQueryAll',
+                    },
+                    'api/v1/rfq': {
+                        'POST': 'rfqSubmit',
+                    },
+                    'api/v1/rfqs': {
+                        'GET': 'rfqQuery',
+                    },
+                    'api/v1/rfq/accept': {
+                        'POST': 'quoteAccept',
+                    },
+                    'api/v1/rfq/cancel': {
+                        'POST': 'rfqCancel',
+                    },
+                    'wapi/v1/history/rfq/fill': {
+                        'GET': 'rfqFillHistoryQueryAll',
+                    },
+                    'wapi/v1/history/quote/fill': {
+                        'GET': 'quoteFillHistoryQueryAll',
+                    },
+                    'wapi/v1/history/quote': {
+                        'GET': 'quoteHistoryQueryAll',
+                    },
+                    'wapi/v1/history/settlement': {
+                        'GET': 'settlementHistoryQueryAll',
+                    },
+                    'api/v1/position': {
+                        'GET': 'positionQuery',
+                    },
+                    'api/v1/rfq/quote': {
+                        'POST': 'quoteSubmit',
+                    },
+                    'wapi/v1/history/strategies': {
+                        'GET': 'strategyHistoryQueryAll',
+                    },
+                    'wapi/v1/capital/withdrawals': {
+                        'GET': 'withdrawalQueryAll',
+                        'POST': 'withdraw',
+                    },
+                },
+                'recvWindow': 5000, // default is 5000, max is 60000
+                'brokerId': '',
+                'currencyIdsListForParseMarket': undefined,
+                'broker': '',
+                'timeDifference': 0, // the difference between system clock and the exchange server clock in milliseconds
+                'adjustForTimeDifference': false, // controls the adjustment logic upon instantiation
+                'networks': {
+                    'APT': 'Aptos',
+                    'ARBITRUM': 'Arbitrum',
+                    'AVAX': 'Avalanche',
+                    'BASE': 'Base',
+                    'BERA': 'Berachain',
+                    'BTC': 'Bitcoin',
+                    'BCH': 'BitcoinCash',
+                    'BEP20': 'Bsc',
+                    'ADA': 'Cardano',
+                    'DOGE': 'Dogecoin',
+                    'ECLIPSE': 'Eclipse',
+                    'EQUALSMONEY': 'EqualsMoney',
+                    'ERC20': 'Ethereum',
+                    'HYP': 'Hyperliquid',
+                    'LTC': 'Litecoin',
+                    'OPTIMISM': 'Optimism',
+                    'MATIC': 'Polygon',
+                    'SEI': 'Sei',
+                    'SUI': 'Sui',
+                    'SOL': 'Solana',
+                    'STORY': 'Story',
+                    'TRC20': 'Tron',
+                    'XRP': 'XRP',
+                },
+                'networksById': {
+                    'aptos': 'APT',
+                    'arbitrum': 'ARBITRUM',
+                    'avalanche': 'AVAX',
+                    'base': 'BASE',
+                    'berachain': 'BERA',
+                    'bitcoin': 'BTC',
+                    'bitcoincash': 'BCH',
+                    'bsc': 'BEP20',
+                    'cardano': 'ADA',
+                    'dogecoin': 'DOGE',
+                    'eclipse': 'ECLIPSE',
+                    'equalsmoney': 'EQUALSMONEY',
+                    'ethereum': 'ERC20',
+                    'hyperliquid': 'HYP',
+                    'litecoin': 'LTC',
+                    'optimism': 'OPTIMISM',
+                    'polygon': 'MATIC',
+                    'sei': 'SEI',
+                    'sui': 'SUI',
+                    'solana': 'SOL',
+                    'story': 'STORY',
+                    'tron': 'TRC20',
+                    'xrp': 'XRP',
+                },
+            },
+            'commonCurrencies': {},
+            'exceptions': {
+                'exact': {
+                    'INVALID_CLIENT_REQUEST': errors.BadRequest,
+                    'INVALID_ORDER': errors.InvalidOrder,
+                    'ACCOUNT_LIQUIDATING': errors.BadRequest,
+                    'BORROW_LIMIT': errors.BadRequest,
+                    'BORROW_REQUIRES_LEND_REDEEM': errors.BadRequest,
+                    'FORBIDDEN': errors.OperationRejected,
+                    'INSUFFICIENT_FUNDS': errors.InsufficientFunds,
+                    'INSUFFICIENT_MARGIN': errors.InsufficientFunds,
+                    'INSUFFICIENT_SUPPLY': errors.InsufficientFunds,
+                    'INVALID_ASSET': errors.BadRequest,
+                    'INVALID_MARKET': errors.BadSymbol,
+                    'INVALID_PRICE': errors.InvalidOrder, // {"code":"INVALID_PRICE","message":"Price is too far from the last active price"}
+                    'INVALID_POSITION_ID': errors.BadRequest,
+                    'INVALID_QUANTITY': errors.BadRequest,
+                    'INVALID_RANGE': errors.BadRequest,
+                    'INVALID_SIGNATURE': errors.AuthenticationError,
+                    'INVALID_SOURCE': errors.BadRequest,
+                    'INVALID_SYMBOL': errors.BadSymbol,
+                    'INVALID_TWO_FACTOR_CODE': errors.BadRequest,
+                    'LEND_LIMIT': errors.BadRequest,
+                    'LEND_REQUIRES_BORROW_REPAY': errors.BadRequest,
+                    'MAINTENANCE': errors.ExchangeError,
+                    'MAX_LEVERAGE_REACHED': errors.InsufficientFunds,
+                    'NOT_IMPLEMENTED': errors.OperationFailed,
+                    'ORDER_LIMIT': errors.OperationRejected,
+                    'POSITION_LIMIT': errors.OperationRejected,
+                    'PRECONDITION_FAILED': errors.OperationFailed,
+                    'RESOURCE_NOT_FOUND': errors.ExchangeNotAvailable,
+                    'SERVER_ERROR': errors.NetworkError,
+                    'TIMEOUT': errors.RequestTimeout,
+                    'TOO_MANY_REQUESTS': errors.RateLimitExceeded,
+                    'TRADING_PAUSED': errors.ExchangeNotAvailable,
+                    'UNAUTHORIZED': errors.AuthenticationError,
+                },
+                // Bad Request parse request payload error: failed to parse "MarketSymbol": Invalid market symbol (occurred while parsing "OrderExecutePayload")
+                // failed to parse parameter `interval`: failed to parse "KlineInterval": Expect a valid enumeration value.
+                'broad': {},
+            },
+        });
+    }
+    /**
+     * @method
+     * @name backpack#fetchCurrencies
+     * @description fetches available crypto and tokenized stock currencies from the assets endpoint
+     * @see https://docs.backpack.exchange/#tag/Assets
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] return tokenized stock assets only
+     * @returns {object} an associative dictionary of currencies
+     */
+    async fetchCurrencies(params = {}) {
+        const selection = this.handleStockParams('fetchCurrencies', params);
+        const stock = this.safeBool(selection, 0, false);
+        const query = this.safeDict(selection, 1, {});
+        const response = await this.publicGetApiV1Assets(query);
+        //
+        //     [
+        //         {
+        //             "coingeckoId": "jito-governance-token",
+        //             "displayName": "Jito",
+        //             "symbol": "JTO",
+        //             "tokens": [
+        //                 {
+        //                     "blockchain": "Solana",
+        //                     "contractAddress": "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
+        //                     "depositEnabled": true,
+        //                     "displayName": "Jito",
+        //                     "maximumWithdrawal": null,
+        //                     "minimumDeposit": "0.28",
+        //                     "minimumWithdrawal": "0.58",
+        //                     "withdrawEnabled": true,
+        //                     "withdrawalFee": "0.29"
+        //                 }
+        //             ]
+        //         }
+        //         ...
+        //     ]
+        //
+        const currencies = {};
+        for (let i = 0; i < response.length; i++) {
+            const currency = this.parseCurrency(this.safeDict(response, i, {}));
+            if (!stock || (this.safeString(currency, 'type') === 'stock')) {
+                currencies[currency['code']] = currency;
+            }
+        }
+        return currencies;
+    }
+    parseCurrency(rawCurrency) {
+        const currencyId = this.safeString(rawCurrency, 'symbol');
+        const symbol = this.safeString(rawCurrency, 'symbol', '');
+        const stock = symbol.endsWith('.US') || symbol.endsWith('.HK');
+        const code = this.safeCurrencyCode(currencyId);
+        const networks = this.safeList(rawCurrency, 'tokens', []);
+        const parsedNetworks = {};
+        for (let j = 0; j < networks.length; j++) {
+            const network = networks[j];
+            const networkId = this.safeString(network, 'blockchain');
+            const networkIdLowerCase = this.safeStringLower(network, 'blockchain');
+            const networkCode = this.networkIdToCode(networkIdLowerCase, code);
+            if (networkCode !== undefined) {
+                parsedNetworks[networkCode] = {
+                    'id': networkId,
+                    'network': networkCode,
+                    'limits': {
+                        'withdraw': {
+                            'min': this.safeNumber(network, 'minimumWithdrawal'),
+                            'max': this.parseNumber(this.omitZero(this.safeString(network, 'maximumWithdrawal'))),
+                        },
+                        'deposit': {
+                            'min': this.safeNumber(network, 'minimumDeposit'),
+                            'max': undefined,
+                        },
+                    },
+                    'active': undefined,
+                    'deposit': this.safeBool(network, 'depositEnabled'),
+                    'withdraw': this.safeBool(network, 'withdrawEnabled'),
+                    'fee': this.safeNumber(network, 'withdrawalFee'),
+                    'precision': undefined,
+                    'info': network,
+                };
+            }
+        }
+        let active = undefined;
+        let deposit = undefined;
+        let withdraw = undefined;
+        if (this.isEmpty(parsedNetworks)) { // if networks are not provided
+            active = (stock) ? undefined : false;
+            deposit = false;
+            withdraw = false;
+        }
+        return this.safeCurrencyStructure({
+            'id': currencyId,
+            'code': code,
+            'precision': undefined,
+            'type': (stock) ? 'stock' : 'crypto',
+            'name': this.safeString(rawCurrency, 'displayName'),
+            'active': active,
+            'deposit': deposit,
+            'withdraw': withdraw,
+            'fee': undefined,
+            'limits': {
+                'deposit': {
+                    'min': undefined,
+                    'max': undefined,
+                },
+                'withdraw': {
+                    'min': undefined,
+                    'max': undefined,
+                },
+            },
+            'networks': parsedNetworks,
+            'info': rawCurrency,
+        });
+    }
+    /**
+     * @method
+     * @name backpack#fetchMarkets
+     * @description retrieves venue markets and tokenized stock RFQ markets discovered from securities
+     * @see https://docs.backpack.exchange/#tag/Markets/operation/get_markets
+     * @see https://docs.backpack.exchange/#tag/Stocks/operation/get_securities
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] return tokenized stock markets only
+     * @param {string|string[]} [params.marketType] market types to discover: spot, swap or stock
+     * @returns {object[]} an array of objects representing market data
+     */
+    async fetchMarkets(params = {}) {
+        if (this.safeBool(this.options, 'adjustForTimeDifference', false)) {
+            await this.loadTimeDifference();
+        }
+        const selection = this.handleStockParams('fetchMarkets', params);
+        const stock = this.safeBool(selection, 0, false);
+        const query = this.safeDict(selection, 1, {});
+        const marketType = this.safeString(query, 'marketType');
+        let requestedTypes = this.safeList(query, 'marketType', ['SPOT', 'PERP', 'RFQ']);
+        if (marketType !== undefined) {
+            requestedTypes = [marketType];
+        }
+        const aliases = { 'spot': 'SPOT', 'swap': 'PERP', 'stock': 'RFQ' };
+        const supportedTypes = ['SPOT', 'PERP', 'RFQ'];
+        const marketTypes = [];
+        for (let i = 0; i < requestedTypes.length; i++) {
+            const requestedType = this.safeString(requestedTypes, i, '');
+            const normalizedType = this.safeString(aliases, requestedType, requestedType);
+            if (!this.inArray(normalizedType, supportedTypes)) {
+                throw new errors.BadRequest(this.id + ' fetchMarkets() unsupported marketType ' + requestedType);
+            }
+            if (!this.inArray(normalizedType, marketTypes)) {
+                marketTypes.push(normalizedType);
+            }
+        }
+        const includeRfq = this.inArray('RFQ', marketTypes);
+        const marketQuery = this.omit(query, 'marketType');
+        if ('marketType' in query) {
+            marketQuery['marketType'] = marketTypes;
+        }
+        const response = await this.publicGetApiV1Markets(marketQuery);
+        let securities = [];
+        if (includeRfq) {
+            securities = await this.fetchSecurities();
+        }
+        const securityById = this.indexBy(securities, 'asset');
+        const markets = [];
+        const marketIds = {};
+        for (let i = 0; i < response.length; i++) {
+            const rawMarket = this.safeDict(response, i, {});
+            const rawType = this.safeString(rawMarket, 'marketType', '');
+            if (!this.inArray(rawType, marketTypes)) {
+                continue;
+            }
+            const baseId = this.safeString(rawMarket, 'baseSymbol');
+            const security = this.safeDict(securityById, baseId);
+            const market = this.parseMarket((security === undefined) ? rawMarket : this.extend(rawMarket, { 'security': security }));
+            if (market !== undefined) {
+                const marketId = this.safeString(market, 'id');
+                if ((marketId === undefined) || (marketId in marketIds)) {
+                    continue;
+                }
+                marketIds[marketId] = true;
+                if (!stock || this.safeBool(market, 'stock', false)) {
+                    markets.push(market);
+                }
+            }
+        }
+        if (includeRfq) {
+            for (let i = 0; i < securities.length; i++) {
+                const security = securities[i];
+                const assetId = this.safeString(security, 'asset');
+                if (assetId === undefined) {
+                    continue;
+                }
+                const marketId = assetId + '_USDC_RFQ';
+                if (!(marketId in marketIds)) {
+                    const market = this.parseMarket({ 'symbol': marketId, 'baseSymbol': assetId, 'quoteSymbol': 'USDC', 'marketType': 'RFQ', 'rwaMarketType': 'STOCK', 'security': security });
+                    if (market !== undefined) {
+                        marketIds[marketId] = true;
+                        markets.push(market);
+                    }
+                }
+            }
+        }
+        return markets;
+    }
+    parseMarket(market) {
+        //
+        //     [
+        //         {
+        //             "baseSymbol": "SOL",
+        //             "createdAt": "2025-01-21T06:34:54.691858",
+        //             "filters": {
+        //                 "price": {
+        //                     "borrowmarketFeeMaxMultiplier": null,
+        //                     "borrowmarketFeeMinMultiplier": null,
+        //                     "maxImpactMultiplier": "1.03",
+        //                     "maxMultiplier": "1.25",
+        //                     "maxPrice": null,
+        //                     "meanMarkPriceBand": {
+        //                         "maxMultiplier": "1.15",
+        //                         "minMultiplier": "0.9"
+        //                     },
+        //                     "meanPremiumBand": null,
+        //                     "minImpactMultiplier": "0.97",
+        //                     "minMultiplier": "0.75",
+        //                     "minPrice": "0.01",
+        //                     "tickSize": "0.01"
+        //                 },
+        //                 "quantity": {
+        //                     "maxQuantity": null,
+        //                     "minQuantity": "0.01",
+        //                     "stepSize": "0.01"
+        //                 }
+        //             },
+        //             "fundingInterval": 28800000,
+        //             "fundingRateLowerBound": null,
+        //             "fundingRateUpperBound": null,
+        //             "imfFunction": null,
+        //             "marketType": "SPOT",
+        //             "mmfFunction": null,
+        //             "openInterestLimit": "0",
+        //             "orderBookState": "Open",
+        //             "quoteSymbol": "USDC",
+        //             "symbol": "SOL_USDC"
+        //         },
+        //         {
+        //             "baseSymbol": "SOL",
+        //             "createdAt": "2025-01-21T06:34:54.691858",
+        //             "filters": {
+        //                 "price": {
+        //                     "borrowEntryFeeMaxMultiplier": null,
+        //                     "borrowEntryFeeMinMultiplier": null,
+        //                     "maxImpactMultiplier": "1.03",
+        //                     "maxMultiplier": "1.25",
+        //                     "maxPrice": "1000",
+        //                     "meanMarkPriceBand": {
+        //                         "maxMultiplier": "1.1",
+        //                         "minMultiplier": "0.9"
+        //                     },
+        //                     "meanPremiumBand": {
+        //                         "tolerancePct": "0.05"
+        //                     },
+        //                     "minImpactMultiplier": "0.97",
+        //                     "minMultiplier": "0.75",
+        //                     "minPrice": "0.01",
+        //                     "tickSize": "0.01"
+        //                 },
+        //                 "quantity": {
+        //                     "maxQuantity": null,
+        //                     "minQuantity": "0.01",
+        //                     "stepSize": "0.01"
+        //                 }
+        //             },
+        //             "fundingInterval": "28800000",
+        //             "fundingRateLowerBound": "-100",
+        //             "fundingRateUpperBound": "100",
+        //             "imfFunction": {
+        //                 "base": "0.02",
+        //                 "factor": "0.0001275",
+        //                 "type": "sqrt"
+        //             },
+        //             "marketType": "PERP",
+        //             "mmfFunction": {
+        //                 "base": "0.0125",
+        //                 "factor": "0.0000765",
+        //                 "type": "sqrt"
+        //             },
+        //             "openInterestLimit": "4000000",
+        //             "orderBookState": "Open",
+        //             "quoteSymbol": "USDC",
+        //             "symbol": "SOL_USDC_PERP"
+        //         }
+        //     ]
+        //
+        // fetchMarkets stock
+        //
+        //     [
+        //         {
+        //             {
+        //                 "asset": "QNDX.US",
+        //                 "cusip": null,
+        //                 "name": "State Street SPDR Portfolio Nasdaq 100 ETF",
+        //                 "sessions": [
+        //                     {
+        //                         "maxQuantity": "1000",
+        //                         "minQuantity": "1",
+        //                         "name": "US_EQUITIES_PRE_MARKET",
+        //                         "stepSize": "1"
+        //                     },
+        //                     {
+        //                         "maxQuantity": "10000",
+        //                         "minQuantity": "0.01",
+        //                         "name": "US_EQUITIES_REGULAR",
+        //                         "stepSize": "0.01"
+        //                     },
+        //                     {
+        //                         "maxQuantity": "1000",
+        //                         "minQuantity": "1",
+        //                         "name": "US_EQUITIES_POST_MARKET",
+        //                         "stepSize": "1"
+        //                     }
+        //                 ]
+        //             },
+        //         }
+        //     ]
+        //
+        const id = this.safeString(market, 'symbol');
+        const baseId = this.safeString(market, 'baseSymbol');
+        const quoteId = this.safeString(market, 'quoteSymbol');
+        const base = this.safeCurrencyCode(baseId);
+        const quote = this.safeCurrencyCode(quoteId);
+        if ((base === undefined) || (quote === undefined)) {
+            return undefined;
+        }
+        let symbol = base + '/' + quote;
+        const filters = this.safeDict(market, 'filters', {});
+        const priceFilter = this.safeDict(filters, 'price', {});
+        const maxPrice = this.safeNumber(priceFilter, 'maxPrice');
+        const minPrice = this.safeNumber(priceFilter, 'minPrice');
+        const pricePrecision = this.safeNumber(priceFilter, 'tickSize');
+        const quantityFilter = this.safeDict(filters, 'quantity', {});
+        let maxQuantity = this.safeNumber(quantityFilter, 'maxQuantity');
+        let minQuantity = this.safeNumber(quantityFilter, 'minQuantity');
+        let amountPrecision = this.safeNumber(quantityFilter, 'stepSize');
+        let type = undefined;
+        const rawType = this.safeString(market, 'marketType');
+        const rfq = rawType === 'RFQ';
+        const security = this.safeDict(market, 'security');
+        const baseSymbol = this.safeString(market, 'baseSymbol', '');
+        const stock = (this.safeString(market, 'rwaMarketType') === 'STOCK') || (security !== undefined) || baseSymbol.endsWith('.US') || baseSymbol.endsWith('.HK');
+        const typeOfMarket = this.parseMarketType(rawType);
+        let linear = undefined;
+        let inverse = undefined;
+        let settle = undefined;
+        let settleId = undefined;
+        let contractSize = undefined;
+        if ((typeOfMarket === 'spot') || rfq) {
+            type = 'spot';
+            if (rfq) {
+                symbol = base + '.RFQ/' + quote;
+                const sessions = this.safeList(security, 'sessions', []);
+                let stepSize = undefined;
+                let minimum = undefined;
+                let maximum = undefined;
+                let unbounded = false;
+                for (let i = 0; i < sessions.length; i++) {
+                    const sessionStep = this.safeString(sessions[i], 'stepSize');
+                    if ((sessionStep !== undefined) && ((stepSize === undefined) || Precise["default"].stringLt(sessionStep, stepSize))) {
+                        stepSize = sessionStep;
+                    }
+                    const sessionMin = this.safeString(sessions[i], 'minQuantity');
+                    const sessionMax = this.safeString(sessions[i], 'maxQuantity');
+                    if ((sessionMin !== undefined) && ((minimum === undefined) || Precise["default"].stringLt(sessionMin, minimum))) {
+                        minimum = sessionMin;
+                    }
+                    if (sessionMax === undefined) {
+                        unbounded = true;
+                    }
+                    else if ((maximum === undefined) || Precise["default"].stringGt(sessionMax, maximum)) {
+                        maximum = sessionMax;
+                    }
+                }
+                const sessionsLength = sessions.length;
+                if (sessionsLength > 0) {
+                    amountPrecision = this.parseNumber(stepSize);
+                    minQuantity = this.parseNumber(minimum);
+                    maxQuantity = (unbounded) ? undefined : this.parseNumber(maximum);
+                }
+            }
+        }
+        else if (typeOfMarket === 'swap') {
+            type = 'swap';
+            linear = true;
+            inverse = false;
+            settleId = this.safeString(market, 'quoteSymbol');
+            settle = this.safeCurrencyCode(settleId);
+            symbol = base + '/' + quote + ':' + quote; // settle is the quote currency
+            contractSize = 1;
+        }
+        else {
+            return undefined;
+        }
+        const orderBookState = this.safeString(market, 'orderBookState');
+        // RFQ active means listed, not currently in session; an explicit order book state takes precedence.
+        const active = (rfq && (orderBookState === undefined)) ? ((id !== undefined) || (this.safeString(security, 'asset') !== undefined)) : (orderBookState === 'Open');
+        return this.safeMarketStructure({
+            'id': id,
+            'symbol': symbol,
+            'base': base,
+            'quote': quote,
+            'settle': settle,
+            'baseId': baseId,
+            'quoteId': quoteId,
+            'settleId': settleId,
+            'type': type,
+            'spot': type === 'spot',
+            'margin': (type === 'spot') && !stock && !rfq,
+            'stock': stock,
+            'executionModel': (rfq) ? 'rfq' : undefined,
+            'swap': type === 'swap',
+            'future': false,
+            'option': false,
+            'active': active,
+            'contract': type !== 'spot',
+            'linear': linear,
+            'inverse': inverse,
+            'taker': undefined, // todo check commission
+            'maker': undefined, // todo check commission
+            'contractSize': contractSize,
+            'expiry': undefined,
+            'expiryDatetime': undefined,
+            'strike': undefined,
+            'optionType': undefined,
+            'precision': {
+                'amount': amountPrecision,
+                'price': pricePrecision,
+            },
+            'limits': {
+                'leverage': {
+                    'min': undefined,
+                    'max': undefined,
+                },
+                'amount': {
+                    'min': minQuantity,
+                    'max': maxQuantity,
+                },
+                'price': {
+                    'min': minPrice,
+                    'max': maxPrice,
+                },
+                'cost': {
+                    'min': undefined,
+                    'max': undefined,
+                },
+            },
+            'created': this.parse8601(this.safeString(market, 'createdAt')),
+            'info': market,
+        });
+    }
+    /**
+     * @ignore
+     * @method
+     * @name backpack#handleStockParams
+     * @description resolves the stock market filter
+     * @param {string} methodName calling method
+     * @param {object} params exchange-specific parameters
+     * @param {object} [market] resolved market
+     * @returns {Array} stock flag and remaining parameters
+     */
+    handleStockParams(methodName, params, market = undefined) {
+        const defaultStock = this.safeBool(market, 'stock', false);
+        const [stock, query] = this.handleOptionBoolAndParams(params, methodName, 'stock', defaultStock);
+        if ((market !== undefined) && stock && !this.safeBool(market, 'stock', false)) {
+            throw new errors.BadSymbol(this.id + ' ' + methodName + '() requires a stock market');
+        }
+        return [stock, query];
+    }
+    /**
+     * @ignore
+     * @method
+     * @name backpack#fetchSecurities
+     * @description fetches stock security metadata and session-specific share quantity constraints
+     * @see https://docs.backpack.exchange/#tag/Stocks/operation/get_securities
+     * @param {object} [params] extra exchange-specific parameters
+     * @returns {object[]} security metadata, not account holdings or proof of equity ownership
+     */
+    async fetchSecurities(params = {}) {
+        const response = await this.publicGetApiV1Securities(params);
+        this.options['securities'] = response;
+        return response;
+    }
+    /**
+     * @ignore
+     * @method
+     * @name backpack#fetchStockIndicativeQuote
+     * @description fetches a size-specific indicative stock quote without submitting or accepting an RFQ
+     * @see https://docs.backpack.exchange/#tag/Stocks/operation/get_stock_indicative_quote
+     * @param {string} symbol unified stock market symbol
+     * @param {string} side buy or sell
+     * @param {float} amount number of base shares
+     * @param {object} [params] extra exchange-specific parameters
+     * @param {boolean} [params.stock] selects tokenized stock data; inferred from symbol when omitted
+     * @returns {object} indicative quote with availability, session constraints and non-guaranteed prices
+     */
+    async fetchStockIndicativeQuote(symbol, side, amount, params = {}) {
+        await this.loadMarkets();
+        const market = this.market(symbol);
+        const selection = this.handleStockParams('fetchStockIndicativeQuote', params, market);
+        const query = this.safeDict(selection, 1, {});
+        if (market['stock'] !== true) {
+            throw new errors.BadSymbol(this.id + ' fetchStockIndicativeQuote() requires a stock market');
+        }
+        if ((side !== 'buy') && (side !== 'sell')) {
+            throw new errors.BadRequest(this.id + ' fetchStockIndicativeQuote() requires buy or sell');
+        }
+        if ((amount === undefined) || !Precise["default"].stringGt(this.numberToString(amount), '0')) {
+            throw new errors.InvalidOrder(this.id + ' fetchStockIndicativeQuote() requires a positive base share quantity');
+        }
+        const request = { 'symbol': market['baseId'], 'side': this.encodeOrderSide(side), 'quantity': this.numberToString(amount) };
+        const requestMethod = 'publicGetApiV1StockIndicativeQuote';
+        return await this[requestMethod](this.extend(query, request));
+    }
+    /**
+     * @ignore
+     * @method
+     * @name backpack#rfqConversionMarket
+     * @description resolves a stock RFQ market for a currency conversion pair
+     * @param {string} fromCode source currency code
+     * @param {string} toCode destination currency code
+     * @returns {object} resolved stock RFQ market
+     */
+    rfqConversionMarket(fromCode, toCode) {
+        const fromIsStock = fromCode.endsWith('.US') || fromCode.endsWith('.HK');
+        const toIsStock = toCode.endsWith('.US') || toCode.endsWith('.HK');
+        if (fromIsStock === toIsStock) {
+            throw new errors.NotSupported(this.id + ' conversion requires exactly one stock currency');
+        }
+        let stockCode = fromCode;
+        let quoteCode = toCode;
+        if (!fromIsStock) {
+            stockCode = toCode;
+            quoteCode = fromCode;
+        }
+        const symbol = stockCode + '.RFQ/' + quoteCode;
+        const market = this.safeDict(this.markets, symbol);
+        if ((market === undefined) || (this.safeString(market, 'executionModel') !== 'rfq') || !this.safeBool(market, 'stock', false)) {
+            throw new errors.BadSymbol(this.id + ' conversion requires a listed stock RFQ market: ' + symbol);
+        }
+        return market;
+    }
+    /**
+     * @ignore
+     * @method
+     * @name backpack#parseConversion
+     * @description converts a submitted or accepted RFQ order into a conversion structure
+     * @param {object} order parsed RFQ order
+     * @param {object} [fromCurrency] source currency
+     * @param {object} [toCurrency] destination currency
+     * @returns {object} unified conversion structure
+     */
+    parseConversion(order, fromCurrency = undefined, toCurrency = undefined) {
+        const fromCode = this.safeString(fromCurrency, 'code');
+        const toCode = this.safeString(toCurrency, 'code');
+        if ((fromCode === undefined) || (toCode === undefined)) {
+            throw new errors.ArgumentsRequired(this.id + ' parseConversion() requires source and destination currencies');
+        }
+        const market = this.rfqConversionMarket(fromCode, toCode);
+        const fromIsBase = fromCode === this.safeString(market, 'base');
+        const filled = this.safeNumber(order, 'filled');
+        const cost = this.safeNumber(order, 'cost');
+        const fee = this.safeDict(order, 'fee');
+        const timestamp = this.safeInteger(order, 'timestamp');
+        return {
+            'info': this.safeDict(order, 'info'),
+            'timestamp': timestamp,
+            'datetime': this.iso8601(timestamp),
+            'id': this.safeString(order, 'id'),
+            'fromCurrency': this.safeCurrencyCode(fromCode),
+            'fromAmount': (fromIsBase) ? filled : cost,
+            'toCurrency': this.safeCurrencyCode(toCode),
+            'toAmount': (fromIsBase) ? cost : filled,
+            'price': this.safeNumber2(order, 'average', 'price'),
+            'fee': this.safeNumber(fee, 'cost'),
+        };
+    }
+    /**
+     * @method
+     * @name backpack#fetchConvertQuote
+     * @description fetches an indicative quote for converting between a tokenized stock and its quote currency
+     * @see https://docs.backpack.exchange/#tag/Stocks/operation/get_stock_indicative_quote
+     * @param {string} fromCode the currency to convert from
+     * @param {string} toCode the currency to convert to
+     * @param {float} amount amount in units of the from currency
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {float} [params.price] optional limit price when converting quote currency to stock
+     * @returns {object} indicative conversion estimate; the price is a bound and is not guaranteed
+     */
+    async fetchConvertQuote(fromCode, toCode, amount = undefined, params = {}) {
+        let amountString = this.numberToString(amount);
+        if ((amountString === undefined) || !Precise["default"].stringGt(amountString, '0')) {
+            throw new errors.ArgumentsRequired(this.id + ' fetchConvertQuote() requires a positive amount');
+        }
+        await this.loadMarkets();
+        const market = this.rfqConversionMarket(fromCode, toCode);
+        const fromIsBase = fromCode === this.safeString(market, 'base');
+        const side = (fromIsBase) ? 'sell' : 'buy';
+        if (!fromIsBase) {
+            const initialQuote = await this.fetchStockIndicativeQuote(market['symbol'], side, 1, { 'stock': true });
+            const initialPrice = this.safeString(initialQuote, 'price');
+            if (!this.safeBool(initialQuote, 'available', false) || (initialPrice === undefined)) {
+                throw new errors.InvalidOrder(this.id + ' fetchConvertQuote() stock indicative quote unavailable: ' + this.safeString(initialQuote, 'reason', 'priceUnavailable'));
+            }
+            let priceParam = this.safeString(params, 'price');
+            if (priceParam === undefined) {
+                priceParam = initialPrice;
+            }
+            if (!Precise["default"].stringGt(priceParam, '0')) {
+                throw new errors.InvalidOrder(this.id + ' fetchConvertQuote() price must be positive');
+            }
+            const rawQuantity = Precise["default"].stringDiv(amountString, priceParam, 18);
+            const preciseQuantity = this.amountToPrecision(market['symbol'], this.parseNumber(rawQuantity));
+            if (preciseQuantity === undefined) {
+                throw new errors.InvalidOrder(this.id + ' fetchConvertQuote() could not determine a stock quantity');
+            }
+            amountString = preciseQuantity;
+            if (!Precise["default"].stringGt(amountString, '0')) {
+                throw new errors.InvalidOrder(this.id + ' fetchConvertQuote() amount is too small for one stock increment');
+            }
+        }
+        let quote = await this.fetchStockIndicativeQuote(market['symbol'], side, this.parseNumber(amountString), { 'stock': true });
+        if (!this.safeBool(quote, 'available', false) || (this.safeString(quote, 'price') === undefined)) {
+            throw new errors.InvalidOrder(this.id + ' fetchConvertQuote() stock indicative quote unavailable: ' + this.safeString(quote, 'reason', 'priceUnavailable'));
+        }
+        if (!fromIsBase) {
+            const quoteQuantity = this.safeString(quote, 'quoteQuantity');
+            const quantityFilter = this.safeDict(quote, 'quantityFilter', {});
+            const stepSize = this.safeString(quantityFilter, 'stepSize');
+            if ((quoteQuantity !== undefined) && (stepSize !== undefined) && Precise["default"].stringGt(quoteQuantity, this.numberToString(amount))) {
+                const reducedQuantity = Precise["default"].stringSub(amountString, stepSize);
+                if ((reducedQuantity === undefined) || !Precise["default"].stringGt(reducedQuantity, '0')) {
+                    throw new errors.InvalidOrder(this.id + ' fetchConvertQuote() amount is too small for one stock increment');
+                }
+                amountString = reducedQuantity;
+                quote = await this.fetchStockIndicativeQuote(market['symbol'], side, this.parseNumber(amountString), { 'stock': true });
+                if (!this.safeBool(quote, 'available', false) || (this.safeString(quote, 'price') === undefined)) {
+                    throw new errors.InvalidOrder(this.id + ' fetchConvertQuote() stock indicative quote unavailable: ' + this.safeString(quote, 'reason', 'priceUnavailable'));
+                }
+            }
+            const finalQuoteQuantity = this.safeString(quote, 'quoteQuantity');
+            if ((finalQuoteQuantity !== undefined) && Precise["default"].stringGt(finalQuoteQuantity, this.numberToString(amount))) {
+                throw new errors.InvalidOrder(this.id + ' fetchConvertQuote() rounded stock quantity exceeds the requested quote-currency amount');
+            }
+        }
+        const quoteAmount = this.safeNumber(quote, 'quoteQuantity');
+        const baseAmount = this.parseNumber(amountString);
+        const fromCurrency = this.safeCurrencyCode(fromCode);
+        const toCurrency = this.safeCurrencyCode(toCode);
+        return {
+            'info': quote,
+            'timestamp': this.safeInteger(quote, 'publishedAt'),
+            'datetime': this.iso8601(this.safeInteger(quote, 'publishedAt')),
+            'id': undefined,
+            'fromCurrency': fromCurrency,
+            'fromAmount': (fromIsBase) ? baseAmount : quoteAmount,
+            'toCurrency': toCurrency,
+            'toAmount': (fromIsBase) ? quoteAmount : baseAmount,
+            'price': this.safeNumber(quote, 'price'),
+            'fee': undefined,
+        };
+    }
+    /**
+     * @method
+     * @name backpack#createConvertTrade
+     * @description converts between a tokenized stock and its quote currency through a bounded RFQ
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/submit_rfq
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/accept_quote
+     * @param {string} id RFQ identifier when accepting a quote, or a numeric client identifier for a new RFQ
+     * @param {string} fromCode the currency to convert from
+     * @param {string} toCode the currency to convert to
+     * @param {float} [amount] amount in units of the from currency
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.quoteId] accept this quote for RFQ id supplied as id
+     * @param {float} [params.price] price bound from fetchConvertQuote; required when buying stock
+     * @param {float} [params.baseAmount] stock quantity when converting quote currency to stock
+     * @param {int} [params.clientOrderId] requester client identifier for a newly submitted RFQ
+     * @returns {object} conversion result; RFQ submission may remain open and is not necessarily a fill
+     */
+    async createConvertTrade(id, fromCode, toCode, amount = undefined, params = {}) {
+        await this.loadMarkets();
+        const market = this.rfqConversionMarket(fromCode, toCode);
+        const selection = this.handleStockParams('createConvertTrade', params, market);
+        const query = this.safeDict(selection, 1, {});
+        const quoteId = this.safeString(query, 'quoteId');
+        if (quoteId !== undefined) {
+            const acceptParams = this.omit(query, ['quoteId', 'price', 'baseAmount', 'clientOrderId']);
+            const accepted = await this.acceptRfqQuote(id, quoteId, this.safeSymbol(undefined, market), acceptParams);
+            return this.parseConversion(accepted, this.currency(fromCode), this.currency(toCode));
+        }
+        if ((amount === undefined) || !Precise["default"].stringGt(this.numberToString(amount), '0')) {
+            throw new errors.ArgumentsRequired(this.id + ' createConvertTrade() requires a positive amount');
+        }
+        const fromIsBase = fromCode === this.safeString(market, 'base');
+        const side = (fromIsBase) ? 'sell' : 'buy';
+        let quantity = this.numberToString(amount);
+        let price = this.safeNumber(query, 'price');
+        if (!fromIsBase) {
+            const baseAmount = this.safeNumber(query, 'baseAmount');
+            if (baseAmount !== undefined) {
+                quantity = this.numberToString(baseAmount);
+            }
+            else {
+                if ((price === undefined) || !Precise["default"].stringGt(this.numberToString(price), '0')) {
+                    const indicative = await this.fetchStockIndicativeQuote(this.safeSymbol(undefined, market), side, 1, { 'stock': true });
+                    if (!this.safeBool(indicative, 'available', false)) {
+                        throw new errors.InvalidOrder(this.id + ' createConvertTrade() stock indicative quote unavailable: ' + this.safeString(indicative, 'reason', 'priceUnavailable'));
+                    }
+                    price = this.safeNumber(indicative, 'price');
+                }
+                if ((price === undefined) || !Precise["default"].stringGt(this.numberToString(price), '0')) {
+                    throw new errors.InvalidOrder(this.id + ' createConvertTrade() buying stock requires a positive price bound');
+                }
+                const rawQuantity = Precise["default"].stringDiv(this.numberToString(amount), this.numberToString(price), 18);
+                const preciseQuantity = this.amountToPrecision(this.safeSymbol(undefined, market), this.parseNumber(rawQuantity));
+                if (preciseQuantity === undefined) {
+                    throw new errors.InvalidOrder(this.id + ' createConvertTrade() could not determine a stock quantity');
+                }
+                quantity = preciseQuantity;
+            }
+            if ((price === undefined) || !Precise["default"].stringGt(this.numberToString(price), '0')) {
+                const indicative = await this.fetchStockIndicativeQuote(this.safeSymbol(undefined, market), side, this.parseNumber(quantity), { 'stock': true });
+                if (!this.safeBool(indicative, 'available', false)) {
+                    throw new errors.InvalidOrder(this.id + ' createConvertTrade() stock indicative quote unavailable: ' + this.safeString(indicative, 'reason', 'priceUnavailable'));
+                }
+                price = this.safeNumber(indicative, 'price');
+            }
+            if ((price === undefined) || !Precise["default"].stringGt(this.numberToString(price), '0')) {
+                throw new errors.InvalidOrder(this.id + ' createConvertTrade() buying stock requires a positive price bound');
+            }
+            let quoteCost = Precise["default"].stringMul(quantity, this.numberToString(price));
+            if (Precise["default"].stringGt(quoteCost, this.numberToString(amount))) {
+                const precision = this.safeDict(market, 'precision', {});
+                const stepSize = this.numberToString(this.safeNumber(precision, 'amount'));
+                if (!Precise["default"].stringGt(stepSize, '0')) {
+                    throw new errors.InvalidOrder(this.id + ' createConvertTrade() cannot safely round stock quantity to the quote-currency budget');
+                }
+                const reducedQuantity = Precise["default"].stringSub(quantity, stepSize);
+                if ((reducedQuantity === undefined) || !Precise["default"].stringGt(reducedQuantity, '0')) {
+                    throw new errors.InvalidOrder(this.id + ' createConvertTrade() stock quantity is too small for one increment');
+                }
+                quantity = reducedQuantity;
+                quoteCost = Precise["default"].stringMul(quantity, this.numberToString(price));
+                if (!Precise["default"].stringGt(quantity, '0') || Precise["default"].stringGt(quoteCost, this.numberToString(amount))) {
+                    throw new errors.InvalidOrder(this.id + ' createConvertTrade() stock quantity exceeds the quote-currency amount');
+                }
+            }
+        }
+        let clientOrderId = this.safeInteger(query, 'clientOrderId');
+        if (clientOrderId === undefined) {
+            clientOrderId = this.safeInteger({ 'id': id }, 'id');
+        }
+        const orderParams = this.omit(query, ['price', 'baseAmount', 'quoteId', 'clientOrderId']);
+        if (clientOrderId !== undefined) {
+            orderParams['clientOrderId'] = clientOrderId;
+        }
+        const order = await this.createRfqOrder(this.safeSymbol(undefined, market), 'market', side, this.parseNumber(quantity), price, this.extend(orderParams, { 'stock': true }));
+        return this.parseConversion(order, this.currency(fromCode), this.currency(toCode));
+    }
+    /**
+     * @ignore
+     * @method
+     * @name backpack#stockDataRequest
+     * @description resolves venue or external stock statistics without treating RFQs as an order book
+     * @param {string} methodName calling method
+     * @param {object} params exchange-specific parameters
+     * @param {object} [market] resolved market
+     * @returns {object} market data parameters
+     */
+    stockDataRequest(methodName, params, market = undefined) {
+        const selection = this.handleStockParams(methodName, params, market);
+        const stock = this.safeBool(selection, 0, false);
+        const query = this.safeDict(selection, 1, {});
+        const request = this.extend({}, query);
+        let source = this.safeString(query, 'source');
+        const marketInfo = this.safeDict(market, 'info', {});
+        const isRfq = (market !== undefined) && (this.safeString(marketInfo, 'marketType') === 'RFQ');
+        if (source === undefined) {
+            source = (isRfq) ? 'External' : 'Venue';
+        }
+        if ((source !== 'Venue') && (source !== 'External')) {
+            throw new errors.BadRequest(this.id + ' ' + methodName + '() source must be Venue or External');
+        }
+        if (source === 'External') {
+            if (!stock) {
+                throw new errors.BadRequest(this.id + ' ' + methodName + '() External provider data requires a stock market symbol or params.stock=true when no symbol is provided');
+            }
+            if ((market !== undefined) && !this.safeBool(market, 'stock', false)) {
+                throw new errors.BadSymbol(this.id + ' ' + methodName + '() External data requires a stock market');
+            }
+            request['source'] = source;
+            if (methodName === 'fetchOHLCV') {
+                const priceType = this.safeString(query, 'priceType', 'Last');
+                const price = this.safeString(query, 'price');
+                if ((priceType !== 'Last') || ((price !== undefined) && (price !== 'last'))) {
+                    throw new errors.BadRequest(this.id + ' fetchOHLCV() External data requires Last prices');
+                }
+                request['priceType'] = 'Last';
+            }
+            else {
+                const interval = this.safeString(query, 'interval', '1d');
+                if (interval !== '1d') {
+                    throw new errors.BadRequest(this.id + ' ' + methodName + '() External tickers require interval=1d');
+                }
+                request['interval'] = interval;
+            }
+        }
+        if (market !== undefined) {
+            if (isRfq) {
+                request['symbol'] = this.safeString(market, 'baseId', '') + '_' + this.safeString(market, 'quoteId', '');
+            }
+            else {
+                request['symbol'] = this.safeString(market, 'id');
+            }
+        }
+        return request;
+    }
+    /**
+     * @ignore
+     * @method
+     * @name backpack#filterStockStructures
+     * @description filters parsed account structures by securities metadata, never by RFQ execution alone
+     * @param {Array} entries parsed trades or orders
+     * @returns {Array} tokenized stock structures
+     */
+    filterStockStructures(entries) {
+        const result = [];
+        for (let i = 0; i < entries.length; i++) {
+            const entry = entries[i];
+            const symbol = this.safeString(entry, 'symbol');
+            const market = this.safeDict(this.markets, symbol);
+            if (this.safeBool(market, 'stock', false)) {
+                result.push(entry);
+            }
+        }
+        return result;
+    }
+    parseMarketType(type) {
+        const types = {
+            'SPOT': 'spot',
+            'PERP': 'swap',
+            // current types are described in the docs, but the exchange returns only 'SPOT' and 'PERP'
+            // 'IPERP': 'swap',
+            // 'DATED': 'swap',
+            // 'PREDICTION': 'swap',
+            // 'RFQ': 'swap',
+        };
+        return this.safeString(types, type, type);
+    }
+    /**
+     * @method
+     * @name backpack#fetchTickers
+     * @description fetches venue or external provider statistics, not executable RFQ prices
+     * @see https://docs.backpack.exchange/#tag/Markets/operation/get_tickers
+     * @param {string[]|undefined} symbols unified symbols of the markets to fetch the ticker for, all market tickers are returned if not assigned
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] return tokenized stock tickers only; inferred from requested symbols when omitted
+     * @param {string} [params.source] Venue or External; RFQ symbols default to External, other symbols default to Venue
+     * @param {string} [params.interval] ticker interval, External requires 1d
+     * @returns {object} a dictionary of [ticker structures]{@link https://docs.ccxt.com/?id=ticker-structure}
+     */
+    async fetchTickers(symbols = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const selection = this.handleStockParams('fetchTickers', params);
+        const stockOnly = this.safeBool(selection, 0, false);
+        const query = this.safeDict(selection, 1, {});
+        const source = this.safeString(query, 'source', 'Venue');
+        let symbolsLength = 0;
+        if (symbols !== undefined) {
+            symbolsLength = symbols.length;
+        }
+        let symbolsResolved = Object.keys(this.markets);
+        if (symbolsLength !== 0) {
+            symbolsResolved = this.marketSymbols(symbols, undefined, false);
+        }
+        let hasRfqSymbol = false;
+        let hasStockSymbol = false;
+        if (symbols !== undefined) {
+            for (let i = 0; i < symbolsResolved.length; i++) {
+                const market = this.market(this.safeString(symbolsResolved, i));
+                if (market['stock'] === true) {
+                    hasStockSymbol = true;
+                }
+                if (this.safeString(market['info'], 'marketType') === 'RFQ') {
+                    hasRfqSymbol = true;
+                }
+            }
+        }
+        const stockExplicitlyDisabled = !this.safeBool2(params, 'stock', 'defaultStock', true);
+        const needsExternalRfqTickers = (source === 'Venue') && (this.safeString(query, 'source') === undefined) && hasRfqSymbol && !stockExplicitlyDisabled;
+        let requestParams = query;
+        if ((source === 'External') && (stockOnly || hasStockSymbol) && !stockExplicitlyDisabled) {
+            requestParams = this.extend(query, { 'stock': true });
+        }
+        const request = this.stockDataRequest('fetchTickers', requestParams);
+        const response = await this.publicGetApiV1Tickers(request);
+        const tickers = this.parseTickers(response);
+        const responseById = this.indexBy(response, 'symbol');
+        let externalResponse = [];
+        let externalResponseById = {};
+        if (needsExternalRfqTickers || (source === 'External')) {
+            const externalParams = this.extend(query, { 'stock': true, 'source': 'External' });
+            externalResponse = await this.publicGetApiV1Tickers(this.stockDataRequest('fetchTickers', externalParams));
+            externalResponseById = this.indexBy(externalResponse, 'symbol');
+        }
+        const result = {};
+        for (let i = 0; i < symbolsResolved.length; i++) {
+            const marketSymbol = symbolsResolved[i];
+            const market = this.market(marketSymbol);
+            if (stockOnly && (market['stock'] !== true)) {
+                continue;
+            }
+            const marketIsRfq = this.safeString(market['info'], 'marketType') === 'RFQ';
+            const ticker = this.safeDict(tickers, marketSymbol);
+            if ((ticker !== undefined) && ((source !== 'External') || (market['stock'] === true))) {
+                result[marketSymbol] = ticker;
+            }
+            else if (marketIsRfq) {
+                const underlyingId = this.safeString(market, 'baseId', '') + '_' + this.safeString(market, 'quoteId', '');
+                const useExternal = (source === 'External') || needsExternalRfqTickers;
+                const tickerSource = (useExternal) ? externalResponseById : responseById;
+                const underlyingTicker = this.safeDict(tickerSource, underlyingId);
+                if (underlyingTicker !== undefined) {
+                    result[marketSymbol] = this.parseTicker(underlyingTicker, market);
+                }
+            }
+        }
+        return this.filterByArrayTickers(result, 'symbol', symbols);
+    }
+    /**
+     * @method
+     * @name backpack#fetchTicker
+     * @description fetches underlying venue or external stock statistics, not an executable RFQ quote
+     * @see https://docs.backpack.exchange/#tag/Markets/operation/get_ticker
+     * @param {string} symbol unified symbol of the market to fetch the ticker for
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] selects tokenized stock data; inferred from symbol when omitted
+     * @param {string} [params.source] Venue or External; RFQ symbols default to External
+     * @param {string} [params.interval] ticker interval, External requires 1d
+     * @returns {object} a [ticker structure]{@link https://docs.ccxt.com/?id=ticker-structure}
+     */
+    async fetchTicker(symbol, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const market = this.market(symbol);
+        const request = this.stockDataRequest('fetchTicker', params, market);
+        const response = await this.publicGetApiV1Ticker(request);
+        return this.parseTicker(response, market);
+    }
+    parseTicker(ticker, market = undefined) {
+        //
+        // fetchTicker/fetchTickers
+        //
+        //     {
+        //         "firstPrice": "327.38",
+        //         "high": "337.99",
+        //         "lastPrice": "317.14",
+        //         "low": "300.01",
+        //         "priceChange": "-10.24",
+        //         "priceChangePercent": "-0.031279",
+        //         "quoteVolume": "21584.32278",
+        //         "symbol": "AAVE_USDC",
+        //         "trades": "245",
+        //         "volume": "65.823"
+        //     }, ...
+        //
+        const marketId = this.safeString(ticker, 'symbol');
+        const marketResolved = (market === undefined) ? this.safeMarket(marketId) : market;
+        const open = this.safeString(ticker, 'firstPrice');
+        const last = this.safeString(ticker, 'lastPrice');
+        const high = this.safeString(ticker, 'high');
+        const low = this.safeString(ticker, 'low');
+        const baseVolume = this.safeString(ticker, 'volume');
+        const quoteVolume = this.safeString(ticker, 'quoteVolume');
+        let percentage = undefined;
+        const percentageNumber = this.safeFloat(ticker, 'priceChangePercent');
+        // in some cases priceChangePercent is a non-numeric string like "N/A"
+        if (percentageNumber !== undefined) {
+            percentage = Precise["default"].stringMul(this.safeString(ticker, 'priceChangePercent'), '100');
+        }
+        const change = this.safeString(ticker, 'priceChange');
+        const parsedTicker = this.safeTicker({
+            'symbol': this.safeString(marketResolved, 'symbol'),
+            'timestamp': undefined,
+            'datetime': undefined,
+            'high': high,
+            'low': low,
+            'bid': undefined,
+            'bidVolume': undefined,
+            'ask': undefined,
+            'askVolume': undefined,
+            'vwap': undefined,
+            'open': open,
+            'close': last,
+            'last': last,
+            'previousClose': undefined,
+            'change': change,
+            'percentage': percentage,
+            'average': undefined,
+            'baseVolume': baseVolume,
+            'quoteVolume': quoteVolume,
+            'markPrice': undefined,
+            'indexPrice': undefined,
+            'info': ticker,
+        }, marketResolved);
+        return parsedTicker;
+    }
+    /**
+     * @method
+     * @name backpack#fetchOrderBook
+     * @description fetches venue order-book depth, RFQ and external provider depth are not supported
+     * @see https://docs.backpack.exchange/#tag/Markets/operation/get_depth
+     * @param {string} symbol unified symbol of the market to fetch the order book for
+     * @param {int} [limit] the maximum amount of order book entries to return (default 100, max 500)
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] selects a tokenized stock spot order book; inferred from symbol when omitted
+     * @param {string} [params.source] Venue, External provider depth is not supported
+     * @returns {object} an [order book structure]{@link https://docs.ccxt.com/?id=order-book-structure}
+     */
+    async fetchOrderBook(symbol, limit = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const market = this.market(symbol);
+        const selection = this.handleStockParams('fetchOrderBook', params, market);
+        const query = this.safeDict(selection, 1, {});
+        const source = this.safeString(query, 'source', 'Venue');
+        if ((source !== 'Venue') || (this.safeString(market['info'], 'marketType') === 'RFQ')) {
+            throw new errors.NotSupported(this.id + ' fetchOrderBook() requires a venue order-book market; use fetchStockIndicativeQuote() for size-specific RFQ prices');
+        }
+        const request = {
+            'symbol': market['id'],
+        };
+        let requestLimit = undefined;
+        if (limit !== undefined) {
+            const supportedLimits = [5, 10, 20, 50, 100, 500];
+            requestLimit = 500;
+            for (let i = 0; i < supportedLimits.length; i++) {
+                const supportedLimit = this.safeInteger(supportedLimits, i, 0);
+                if (limit <= supportedLimit) {
+                    requestLimit = supportedLimit;
+                    break;
+                }
+            }
+            request['limit'] = requestLimit;
+        }
+        const response = await this.publicGetApiV1Depth(this.extend(request, this.omit(query, 'source')));
+        const microseconds = this.safeInteger(response, 'timestamp');
+        if (microseconds === undefined) {
+            throw new errors.ExchangeError(this.id + ' fetchOrderBook() missing microseconds');
+        }
+        const timestamp = this.parseToInt(microseconds / 1000);
+        const orderbook = this.parseOrderBook(response, symbol, timestamp);
+        orderbook['nonce'] = this.safeInteger(response, 'lastUpdateId');
+        if (limit !== undefined) {
+            orderbook['bids'] = this.arraySlice(orderbook['bids'], 0, limit);
+            orderbook['asks'] = this.arraySlice(orderbook['asks'], 0, limit);
+        }
+        return orderbook;
+    }
+    /**
+     * @method
+     * @name backpack#fetchOHLCV
+     * @description fetches venue or external stock candlestick data for the underlying market
+     * @see https://docs.backpack.exchange/#tag/Markets/operation/get_klines
+     * @param {string} symbol unified symbol of the market to fetch OHLCV data for
+     * @param {string} timeframe the length of time each candle represents
+     * @param {int} [since] timestamp in milliseconds of the earliest candle to fetch
+     * @param {int} [limit] the maximum amount of candles to fetch (default 100)
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] selects tokenized stock data; inferred from symbol when omitted
+     * @param {string} [params.source] Venue or External; RFQ symbols default to External
+     * @param {string} [params.price] last, mark or index, External requires last
+     * @param {string} [params.priceType] Last, Mark or Index, External requires Last
+     * @param {int} [params.until] latest candle timestamp in milliseconds
+     * @returns {int[][]} a list of candles ordered as timestamp, open, high, low, close, volume
+     */
+    async fetchOHLCV(symbol, timeframe = '1m', since = undefined, limit = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const maxLimit = 2000;
+        const market = this.market(symbol);
+        const interval = this.safeString(this.timeframes, timeframe, timeframe);
+        const duration = this.parseTimeframe(timeframe) * 1000;
+        const dataRequest = this.stockDataRequest('fetchOHLCV', params, market);
+        const request = { 'symbol': this.safeString(dataRequest, 'symbol'), 'interval': interval };
+        const [until, paramsUntil] = this.handleOptionIntegerAndParams(this.omit(dataRequest, 'symbol'), 'fetchOHLCV', 'until');
+        if (until !== undefined) {
+            request['endTime'] = this.parseToInt(until / 1000); // convert milliseconds to seconds
+        }
+        const defaultLimit = 100;
+        let limitResolved = limit;
+        if (limitResolved !== undefined) {
+            limitResolved = Math.min(limitResolved, maxLimit);
+        }
+        const windowLimit = (limitResolved === undefined) ? defaultLimit : limitResolved;
+        const now = this.milliseconds();
+        let startTime = since;
+        let untilValue = until;
+        if (startTime === undefined) {
+            if (untilValue === undefined) {
+                untilValue = now;
+            }
+            startTime = untilValue - (windowLimit * duration);
+        }
+        request['startTime'] = this.parseToInt(startTime / 1000);
+        // set until value
+        if (untilValue === undefined) {
+            const windowEnd = this.sum(startTime, windowLimit * duration);
+            untilValue = Math.min(now, windowEnd);
+        }
+        request['endTime'] = this.parseToInt(untilValue / 1000);
+        const price = this.safeString(paramsUntil, 'price');
+        const paramsOmitted = (price !== undefined) ? this.omit(paramsUntil, 'price') : paramsUntil;
+        if (price !== undefined) {
+            request['priceType'] = this.capitalize(price);
+        }
+        const response = await this.publicGetApiV1Klines(this.extend(request, paramsOmitted));
+        const ohlcvs = this.toArray(response);
+        return this.parseOHLCVs(ohlcvs, market, timeframe, since, limitResolved);
+    }
+    parseOHLCV(ohlcv, market = undefined) {
+        //
+        //     [
+        //         {
+        //             "close": "118294.6",
+        //             "end": "2025-07-19 13:12:00",
+        //             "high": "118297.6",
+        //             "low": "118237.5",
+        //             "open": "118238",
+        //             "quoteVolume": "4106.558156",
+        //             "start": "2025-07-19 13:09:00",
+        //             "trades": "12",
+        //             "volume": "0.03473"
+        //         },
+        //         ...
+        //     ]
+        //
+        return [
+            this.parse8601(this.safeString(ohlcv, 'start')),
+            this.safeNumber(ohlcv, 'open'),
+            this.safeNumber(ohlcv, 'high'),
+            this.safeNumber(ohlcv, 'low'),
+            this.safeNumber(ohlcv, 'close'),
+            this.safeNumber(ohlcv, 'volume'),
+        ];
+    }
+    /**
+     * @method
+     * @name backpack#fetchFundingRate
+     * @description fetch the current funding rate
+     * @see https://docs.backpack.exchange/#tag/Markets/operation/get_mark_prices
+     * @param {string} symbol unified market symbol
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a [funding rate structure]{@link https://docs.ccxt.com/?id=funding-rate-structure}
+     */
+    async fetchFundingRate(symbol, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const market = this.market(symbol);
+        if (this.safeBool(market, 'spot', false)) {
+            throw new errors.BadRequest(this.id + ' fetchFundingRate() symbol does not support market ' + symbol);
+        }
+        const request = {
+            'symbol': market['id'],
+        };
+        const response = await this.publicGetApiV1MarkPrices(this.extend(request, params));
+        const data = this.safeDict(response, 0, {});
+        return this.parseFundingRate(data, market);
+    }
+    parseFundingRate(contract, market = undefined) {
+        //
+        //     {
+        //         "fundingRate": "0.0001",
+        //         "indexPrice": "118333.18643195",
+        //         "markPrice": "118343.51853741",
+        //         "nextFundingTimestamp": 1753113600000,
+        //         "symbol": "BTC_USDC_PERP"
+        //     }
+        //
+        const marketId = this.safeString(contract, 'symbol');
+        const marketResolved = this.safeMarket(marketId, market);
+        const symbol = this.safeSymbol(marketId, marketResolved);
+        const nextFundingTimestamp = this.safeInteger(contract, 'nextFundingTimestamp');
+        return {
+            'info': contract,
+            'symbol': symbol,
+            'markPrice': this.safeNumber(contract, 'markPrice'),
+            'indexPrice': this.safeNumber(contract, 'indexPrice'),
+            'interestRate': undefined,
+            'estimatedSettlePrice': undefined,
+            'timestamp': undefined,
+            'datetime': undefined,
+            'fundingRate': this.safeNumber(contract, 'fundingRate'),
+            'fundingTimestamp': undefined,
+            'fundingDatetime': undefined,
+            'nextFundingRate': undefined,
+            'nextFundingTimestamp': nextFundingTimestamp,
+            'nextFundingDatetime': this.iso8601(nextFundingTimestamp),
+            'previousFundingRate': undefined,
+            'previousFundingTimestamp': undefined,
+            'previousFundingDatetime': undefined,
+            'interval': '1h',
+        };
+    }
+    /**
+     * @method
+     * @name backpack#fetchOpenInterest
+     * @description Retrieves the open interest of a derivative trading pair
+     * @see https://docs.backpack.exchange/#tag/Markets/operation/get_open_interest
+     * @param {string} symbol Unified CCXT market symbol
+     * @param {object} [params] exchange specific parameters
+     * @returns {object} an open interest structure{@link https://docs.ccxt.com/?id=interest-history-structure}
+     */
+    async fetchOpenInterest(symbol, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const market = this.market(symbol);
+        if (this.safeBool(market, 'spot', false)) {
+            throw new errors.BadRequest(this.id + ' fetchOpenInterest() symbol does not support market ' + symbol);
+        }
+        const request = {
+            'symbol': market['id'],
+        };
+        const response = await this.publicGetApiV1OpenInterest(this.extend(request, params));
+        const interest = this.safeDict(response, 0, {});
+        return this.parseOpenInterest(interest, market);
+    }
+    parseOpenInterest(interest, market = undefined) {
+        //
+        //     [
+        //         {
+        //             "openInterest": "1273.85214",
+        //             "symbol": "BTC_USDC_PERP",
+        //             "timestamp":1753105735301
+        //         }
+        //     ]
+        //
+        const timestamp = this.safeInteger(interest, 'timestamp');
+        const openInterest = this.safeNumber(interest, 'openInterest');
+        return this.safeOpenInterest({
+            'symbol': this.safeString(market, 'symbol'),
+            'openInterestAmount': undefined,
+            'openInterestValue': openInterest,
+            'timestamp': timestamp,
+            'datetime': this.iso8601(timestamp),
+            'info': interest,
+        }, market);
+    }
+    /**
+     * @method
+     * @name backpack#fetchFundingRateHistory
+     * @description fetches historical funding rate prices
+     * @see https://docs.backpack.exchange/#tag/Markets/operation/get_funding_interval_rates
+     * @param {string} symbol unified symbol of the market to fetch the funding rate history for
+     * @param {int} [since] timestamp in ms of the earliest funding rate to fetch
+     * @param {int} [limit] the maximum amount of funding rate structures
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object[]} a list of [funding rate structures]{@link https://docs.ccxt.com/?id=funding-rate-history-structure}
+     */
+    async fetchFundingRateHistory(symbol = undefined, since = undefined, limit = undefined, params = {}) {
+        if (symbol === undefined) {
+            throw new errors.ArgumentsRequired(this.id + ' fetchFundingRateHistory() requires a symbol argument');
+        }
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const market = this.market(symbol);
+        const request = {
+            'symbol': market['id'],
+        };
+        if (limit !== undefined) {
+            request['limit'] = Math.min(limit, 1000); // api maximum 1000
+        }
+        const response = await this.publicGetApiV1FundingRates(this.extend(request, params));
+        //
+        //     [
+        //         {
+        //             "fundingRate": "0.0001",
+        //             "intervalEndTimestamp": "2025-07-22T00:00:00",
+        //             "symbol": "BTC_USDC_PERP"
+        //         }
+        //     ]
+        //
+        const rates = [];
+        const rawRates = this.toArray(response);
+        for (let i = 0; i < rawRates.length; i++) {
+            const rate = rawRates[i];
+            const datetime = this.safeString(rate, 'intervalEndTimestamp');
+            const timestamp = this.parse8601(datetime);
+            rates.push({
+                'info': rate,
+                'symbol': market['symbol'],
+                'fundingRate': this.safeNumber(rate, 'fundingRate'),
+                'timestamp': timestamp,
+                'datetime': datetime,
+            });
+        }
+        const sorted = this.sortBy(rates, 'timestamp');
+        return this.filterBySymbolSinceLimit(sorted, this.safeString(market, 'symbol'), since, limit);
+    }
+    /**
+     * @method
+     * @name backpack#fetchTrades
+     * @description gets recent venue order-book trades, not public RFQ or external provider fills
+     * @see https://docs.backpack.exchange/#tag/Trades/operation/get_recent_trades
+     * @see https://docs.backpack.exchange/#tag/Trades/operation/get_historical_trades
+     * @param {string} symbol unified symbol of the market to fetch trades for
+     * @param {int} [since] timestamp in ms of the earliest trade to fetch
+     * @param {int} [limit] the maximum amount of trades to fetch
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {int} [params.offset] the number of trades to skip, default is 0
+     * @param {boolean} [params.stock] selects tokenized stock spot trades; inferred from symbol when omitted
+     * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=public-trades}
+     */
+    async fetchTrades(symbol, since = undefined, limit = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const market = this.market(symbol);
+        const selection = this.handleStockParams('fetchTrades', params, market);
+        const query = this.safeDict(selection, 1, {});
+        if ((this.safeString(query, 'source', 'Venue') !== 'Venue') || (this.safeString(market['info'], 'marketType') === 'RFQ')) {
+            throw new errors.NotSupported(this.id + ' fetchTrades() only supports venue order-book trades; use fetchMyTrades() for RFQ fills');
+        }
+        const request = {
+            'symbol': market['id'],
+        };
+        if (limit !== undefined) {
+            request['limit'] = Math.min(limit, 1000); // api maximum 1000
+        }
+        let response = undefined;
+        const offset = this.safeInteger(query, 'offset');
+        if (offset !== undefined) {
+            response = await this.publicGetApiV1TradesHistory(this.extend(request, query));
+        }
+        else {
+            response = await this.publicGetApiV1Trades(this.extend(request, query));
+        }
+        const responseList = this.toArray(response);
+        return this.parseTrades(responseList, market, since, limit);
+    }
+    /**
+     * @method
+     * @name backpack#fetchMyTrades
+     * @description fetches venue fills or requester RFQ fills, combining stock records when no symbol is supplied
+     * @see https://docs.backpack.exchange/#tag/History/operation/get_fills
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/get_rfq_fill_history
+     * @param {string} symbol unified market symbol
+     * @param {int} [since] the earliest time in ms to fetch trades for, locally filtered for RFQ history pages
+     * @param {int} [limit] the maximum number of trades structures to retrieve (default 100, max 1000)
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {int} [params.until] the latest time in ms to fetch trades for, locally filtered for RFQ history pages
+     * @param {boolean} [params.stock] selects tokenized stock fills; inferred from symbol when omitted
+     * @param {boolean} [params.rfq] selects requester RFQ fills only, inferred from RFQ symbols
+     * @param {int} [params.offset] exchange history pagination offset
+     * @param {string} [params.sortDirection] Asc or Desc
+     * @param {boolean} [params.deferredSettlement] selects deferred or immediate RFQ settlement records
+     * @param {string} [params.fillType] User or CollateralConversion for RFQs, additional exchange-specific types for venue fills
+     * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
+     */
+    async fetchMyTrades(symbol = undefined, since = undefined, limit = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const request = {};
+        let market = undefined;
+        if (symbol !== undefined) {
+            market = this.market(symbol);
+            request['symbol'] = this.safeString(market, 'id');
+        }
+        const selection = this.handleStockParams('fetchMyTrades', params, market);
+        const stock = this.safeBool(selection, 0, false);
+        const query = this.safeDict(selection, 1, {});
+        const rfq = this.safeBool(query, 'rfq', false) || (this.safeString(this.safeDict(market, 'info'), 'marketType') === 'RFQ');
+        const aggregate = stock && (market === undefined) && !rfq;
+        if (rfq && (market !== undefined) && (this.safeString(market['info'], 'marketType') !== 'RFQ')) {
+            throw new errors.BadSymbol(this.id + ' fetchMyTrades() rfq requires an RFQ market symbol');
+        }
+        const accountParams = this.omit(query, ['rfq', 'until']);
+        const until = this.safeInteger(query, 'until');
+        if (rfq || aggregate) {
+            const rfqRequest = {};
+            if (market !== undefined) {
+                rfqRequest['symbol'] = this.safeString(market, 'id');
+            }
+            if (limit !== undefined) {
+                rfqRequest['limit'] = Math.min(limit, 1000);
+            }
+            const rfqParams = this.omit(accountParams, ['assetClass', 'marketType', 'from', 'to']);
+            const rfqResponse = await this.privateGetWapiV1HistoryRfqFill(this.extend(rfqRequest, rfqParams));
+            let rfqTrades = this.parseTrades(rfqResponse, market, since);
+            if (aggregate) {
+                const venueParams = this.extend(this.omit(accountParams, ['rfqId', 'quoteId', 'deferredSettlement']), { 'assetClass': 'STOCK', 'stock': false });
+                const venueTrades = await this.fetchMyTrades(undefined, since, limit, venueParams);
+                rfqTrades = this.arrayConcat(rfqTrades, venueTrades);
+            }
+            if (stock) {
+                rfqTrades = this.filterStockStructures(rfqTrades);
+            }
+            const filtered = [];
+            for (let i = 0; i < rfqTrades.length; i++) {
+                const trade = rfqTrades[i];
+                const timestamp = this.safeInteger(trade, 'timestamp');
+                if ((until === undefined) || ((timestamp !== undefined) && (timestamp <= until))) {
+                    filtered.push(trade);
+                }
+            }
+            const sorted = this.sortBy(filtered, 'timestamp');
+            return this.filterBySinceLimit(sorted, since, limit);
+        }
+        if (since !== undefined) {
+            request['from'] = since;
+        }
+        if (limit !== undefined) {
+            request['limit'] = limit;
+        }
+        const paramsOmitted = accountParams;
+        if (stock) {
+            request['assetClass'] = 'STOCK';
+        }
+        if (until !== undefined) {
+            request['to'] = until;
+        }
+        const fillType = this.safeString(paramsOmitted, 'fillType');
+        if (fillType === undefined) {
+            request['fillType'] = 'User'; // default
+        }
+        const response = await this.privateGetWapiV1HistoryFills(this.extend(paramsOmitted, request));
+        const responseList = this.toArray(response);
+        return this.parseTrades(responseList, market, since, limit);
+    }
+    parseTrade(trade, market = undefined) {
+        //
+        // fetchTrades
+        //     {
+        //         "id": 8721563,
+        //         "isBuyerMaker": false,
+        //         "price": "117427.6",
+        //         "quantity": "0.00016",
+        //         "quoteQuantity": "18.788416",
+        //         "timestamp": 1753123916819
+        //     }
+        //
+        // fetchMyTrades
+        //     {
+        //         "clientId": null,
+        //         "fee": "0.004974",
+        //         "feeSymbol": "USDC",
+        //         "isMaker": false,
+        //         "orderId": "4238907375",
+        //         "price": "3826.15",
+        //         "quantity": "0.0026",
+        //         "side": "Bid",
+        //         "symbol": "ETH_USDC_PERP",
+        //         "systemOrderType": null,
+        //         "timestamp": "2025-07-27T17:39:00.092",
+        //         "tradeId": 9748827
+        //     }
+        //
+        const id = this.safeString2(trade, 'id', 'tradeId');
+        const marketId = this.safeString(trade, 'symbol');
+        const marketResolved = this.safeMarket(marketId, market);
+        const price = this.safeString2(trade, 'fillPrice', 'price');
+        const amount = this.safeString2(trade, 'fillQuantity', 'quantity');
+        const isBuyerMaker = this.safeBool(trade, 'isBuyerMaker');
+        let side = this.parseOrderSide(this.safeString(trade, 'side'));
+        const isMaker = this.safeBool(trade, 'isMaker');
+        let takerOrMaker = undefined;
+        if (isMaker !== undefined) {
+            takerOrMaker = isMaker ? 'maker' : 'taker';
+        }
+        else if (isBuyerMaker !== undefined) {
+            takerOrMaker = 'taker';
+            side = isBuyerMaker ? 'sell' : 'buy';
+        }
+        const orderId = this.safeString2(trade, 'orderId', 'rfqId');
+        let fee = undefined;
+        const feeAmount = this.safeString(trade, 'fee');
+        let timestamp = this.safeInteger(trade, 'timestamp');
+        if (feeAmount !== undefined) {
+            // if fetchMyTrades
+            const datetime = this.safeString(trade, 'timestamp');
+            timestamp = this.parse8601(datetime);
+        }
+        const filledAt = this.safeString(trade, 'filledAt');
+        if (filledAt !== undefined) {
+            timestamp = this.parse8601(filledAt);
+        }
+        const feeSymbol = this.safeCurrencyCode(this.safeString(trade, 'feeSymbol'));
+        if (feeAmount !== undefined) {
+            fee = {
+                'cost': feeAmount,
+                'currency': feeSymbol,
+                'rate': undefined,
+            };
+        }
+        return this.safeTrade({
+            'info': trade,
+            'timestamp': timestamp,
+            'datetime': this.iso8601(timestamp),
+            'symbol': marketResolved['symbol'],
+            'id': id,
+            'order': orderId,
+            'type': undefined,
+            'side': side,
+            'takerOrMaker': takerOrMaker,
+            'price': price,
+            'amount': amount,
+            'cost': this.safeString2(trade, 'fillQuoteQuantity', 'quoteQuantity'),
+            'fee': fee,
+        }, marketResolved);
+    }
+    /**
+     * @method
+     * @name backpack#fetchStatus
+     * @description the latest known information on the availability of the exchange API
+     * @see https://docs.backpack.exchange/#tag/System/operation/get_status
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a [status structure]{@link https://docs.ccxt.com/?id=exchange-status-structure}
+     */
+    async fetchStatus(params = {}) {
+        const response = await this.publicGetApiV1Status(params);
+        //
+        //     {
+        //         "message":null,
+        //         "status":"Ok"
+        //     }
+        //
+        const status = this.safeString(response, 'status');
+        if (status === undefined) {
+            throw new errors.ExchangeError(this.id + ' fetchStatus() missing status');
+        }
+        return {
+            'status': status.toLowerCase(),
+            'updated': undefined,
+            'eta': undefined,
+            'url': undefined,
+            'info': response,
+        };
+    }
+    /**
+     * @method
+     * @name backpack#fetchTime
+     * @description fetches the current integer timestamp in milliseconds from the exchange server
+     * @see https://developer-pro.bitmart.com/en/spot/#get-system-time
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {int} the current integer timestamp in milliseconds from the exchange server
+     */
+    async fetchTime(params = {}) {
+        const response = await this.publicGetApiV1Time(params);
+        //
+        //     1753131712992
+        //
+        return this.safeInteger(response, 0, this.milliseconds());
+    }
+    /**
+     * @method
+     * @name backpack#fetchBalance
+     * @description queries the capital account, optionally filtering tokenized stock assets locally
+     * @see https://docs.backpack.exchange/#tag/Capital/operation/get_balances
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] return tokenized stock holdings only, without quote-currency cash
+     * @returns {object} a [balance structure]{@link https://docs.ccxt.com/?id=balance-structure}
+     */
+    async fetchBalance(params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const selection = this.handleStockParams('fetchBalance', params);
+        const stock = this.safeBool(selection, 0, false);
+        const query = this.safeDict(selection, 1, {});
+        const response = await this.privateGetApiV1Capital(query);
+        if (stock) {
+            let securities = this.safeList(this.options, 'securities');
+            if (securities === undefined) {
+                securities = await this.fetchSecurities();
+            }
+            const securityIds = this.indexBy(securities, 'asset');
+            const balances = {};
+            const assetIds = Object.keys(response);
+            for (let i = 0; i < assetIds.length; i++) {
+                const assetId = assetIds[i];
+                if (assetId in securityIds) {
+                    balances[assetId] = response[assetId];
+                }
+            }
+            return this.parseBalance(balances);
+        }
+        return this.parseBalance(response);
+    }
+    parseBalance(response) {
+        //
+        //     {
+        //         "USDC": {
+        //             "available": "120",
+        //             "locked": "0",
+        //             "staked": "0"
+        //         }
+        //     }
+        //
+        const balanceKeys = Object.keys(response);
+        const result = {};
+        for (let i = 0; i < balanceKeys.length; i++) {
+            const id = balanceKeys[i];
+            const code = this.safeCurrencyCode(id);
+            const balance = this.safeDict(response, id);
+            const account = this.account();
+            const locked = this.safeString(balance, 'locked');
+            const staked = this.safeString(balance, 'staked');
+            const used = Precise["default"].stringAdd(locked, staked);
+            account['free'] = this.safeString(balance, 'available');
+            account['used'] = used;
+            if (code !== undefined) {
+                result[code] = account;
+            }
+        }
+        return this.safeBalance(result);
+    }
+    /**
+     * @method
+     * @name backpack#fetchDeposits
+     * @description fetch all deposits made to an account
+     * @see https://docs.backpack.exchange/#tag/Capital/operation/get_deposits
+     * @param {string} code unified currency code
+     * @param {int} [since] the earliest time in ms to fetch deposits for
+     * @param {int} [limit] the maximum number of deposits structures to retrieve
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {int} [params.until] the latest time in ms to fetch entries for
+     * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
+     */
+    async fetchDeposits(code = undefined, since = undefined, limit = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const request = {};
+        let currency = undefined;
+        if (code !== undefined) {
+            currency = this.currency(code);
+        }
+        if (since !== undefined) {
+            request['from'] = since;
+        }
+        if (limit !== undefined) {
+            request['limit'] = limit; // default 100, max 1000
+        }
+        const [until, paramsUntil] = this.handleOptionIntegerAndParams(params, 'fetchDeposits', 'until');
+        if (until !== undefined) {
+            request['endTime'] = until;
+        }
+        const response = await this.privateGetWapiV1CapitalDeposits(this.extend(request, paramsUntil));
+        return this.parseTransactions(response, currency, since, limit);
+    }
+    /**
+     * @method
+     * @name backpack#fetchWithdrawals
+     * @description fetch all withdrawals made from an account
+     * @see https://docs.backpack.exchange/#tag/Capital/operation/get_withdrawals
+     * @param {string} code unified currency code of the currency transferred
+     * @param {int} [since] the earliest time in ms to fetch transfers for (default 24 hours ago)
+     * @param {int} [limit] the maximum number of transfer structures to retrieve (default 50, max 200)
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {int} [params.until] the latest time in ms to fetch transfers for (default time now)
+     * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
+     */
+    async fetchWithdrawals(code = undefined, since = undefined, limit = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const request = {};
+        let currency = undefined;
+        if (code !== undefined) {
+            currency = this.currency(code);
+        }
+        if (since !== undefined) {
+            request['from'] = since;
+        }
+        if (limit !== undefined) {
+            request['limit'] = limit;
+        }
+        const [until, paramsUntil] = this.handleOptionIntegerAndParams(params, 'fetchWithdrawals', 'until');
+        if (until !== undefined) {
+            request['to'] = until;
+        }
+        const response = await this.privateGetWapiV1CapitalWithdrawals(this.extend(request, paramsUntil));
+        return this.parseTransactions(response, currency, since, limit);
+    }
+    /**
+     * @method
+     * @name backpack#withdraw
+     * @description make a withdrawal
+     * @see https://docs.backpack.exchange/#tag/Capital/operation/request_withdrawal
+     * @param {string} code unified currency code
+     * @param {float} amount the amount to withdraw
+     * @param {string} address the address to withdraw to
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.tag] memo / destination tag, required for currencies in options['withdrawTagRequiredCurrencies']
+     * @param {string} params.network the network to withdraw on (mandatory)
+     * @returns {object} a [transaction structure]{@link https://docs.ccxt.com/?id=transaction-structure}
+     */
+    async withdraw(code, amount, address, params = {}) {
+        const [tag, paramsWithdrawTag] = this.handleParamString(params, 'tag');
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const currency = this.currency(code);
+        const request = {
+            'symbol': currency['id'],
+            'quantity': this.numberToString(amount),
+            'address': address,
+        };
+        if (tag !== undefined) {
+            request['clientId'] = tag; // memo or tag
+        }
+        const [networkCode, query] = this.handleNetworkCodeAndParams(paramsWithdrawTag);
+        const networkId = this.networkCodeToId(networkCode, this.safeString(currency, 'code'));
+        if (networkId === undefined) {
+            throw new errors.BadRequest(this.id + ' withdraw() requires a network parameter');
+        }
+        request['blockchain'] = networkId;
+        const response = await this.privatePostWapiV1CapitalWithdrawals(this.extend(request, query));
+        return this.parseTransaction(response, currency);
+    }
+    parseTransaction(transaction, currency = undefined) {
+        //
+        // fetchDeposits
+        //     [
+        //         {
+        //             "createdAt": "2025-07-23T13:55:54.267",
+        //             "fiatAmount": null,
+        //             "fiatCurrency": null,
+        //             "fromAddress": "0x2e3ab3e88a7dbdc763aadf5b28c18fb085af420a",
+        //             "id": 6695353,
+        //             "institutionBic": null,
+        //             "platformMemo": null,
+        //             "quantity": "120",
+        //             "source": "ethereum",
+        //             "status": "confirmed",
+        //             "symbol": "USDC",
+        //             "toAddress": "0xfBe7CbfCde93c8a4204a4be6B56732Eb32690170",
+        //             "transactionHash": "0x58edaac415398d617b34c6673fffcaf0024990d5700565030119db5cbf3765d1"
+        //         }
+        //     ]
+        //
+        // withdraw
+        //     {
+        //         "accountIdentifier": null,
+        //         "bankIdentifier": null,
+        //         "bankName": null,
+        //         "blockchain": "Ethereum",
+        //         "clientId": null,
+        //         "createdAt": "2025-08-13T19:27:13.817",
+        //         "fee": "3",
+        //         "fiatFee": null,
+        //         "fiatState": null,
+        //         "fiatSymbol": null,
+        //         "id": 5479929,
+        //         "identifier": null,
+        //         "isInternal": false,
+        //         "providerId": null,
+        //         "quantity": "10",
+        //         "status": "pending",
+        //         "subaccountId": null,
+        //         "symbol": "USDC",
+        //         "toAddress": "0x0ad42b8e602c2d3d475ae52d678cf63d84ab2749",
+        //         "transactionHash": null,
+        //         "triggerAt": null
+        //     }
+        //
+        // fetchWithdrawals
+        //     [
+        //         {
+        //             "accountIdentifier": null,
+        //             "bankIdentifier": null,
+        //             "bankName": null,
+        //             "blockchain": "Ethereum",
+        //             "clientId": null,
+        //             "createdAt": "2025-08-13T19:27:13.817",
+        //             "fee": "3",
+        //             "fiatFee": null,
+        //             "fiatState": null,
+        //             "fiatSymbol": null,
+        //             "id": 5479929,
+        //             "identifier": null,
+        //             "isInternal": false,
+        //             "providerId": null,
+        //             "quantity": "10",
+        //             "status": "confirmed",
+        //             "subaccountId": null,
+        //             "symbol": "USDC",
+        //             "toAddress": "0x0ad42b8e602c2d3d475ae52d678cf63d84ab2749",
+        //             "transactionHash": "0x658b6d082af4afa0d3cf85caf344ff7c19d980117726bf193b00d8850f8746a1",
+        //             "triggerAt": null
+        //         }
+        //     ]
+        //
+        const status = this.parseTransactionStatus(this.safeString(transaction, 'status'));
+        const id = this.safeString(transaction, 'id');
+        const txid = this.safeString(transaction, 'transactionHash');
+        const coin = this.safeString(transaction, 'symbol');
+        const code = this.safeCurrencyCode(coin, currency);
+        const timestamp = this.parse8601(this.safeString(transaction, 'createdAt'));
+        const amount = this.safeNumber(transaction, 'quantity');
+        const networkId = this.safeStringLower2(transaction, 'source', 'blockchain');
+        const network = this.networkIdToCode(networkId, code);
+        const addressTo = this.safeString(transaction, 'toAddress');
+        const addressFrom = this.safeString(transaction, 'fromAddress');
+        const tag = this.safeString(transaction, 'platformMemo');
+        const feeCost = this.safeNumber(transaction, 'fee');
+        const internal = this.safeBool(transaction, 'isInternal', false);
+        let fee = undefined;
+        if (feeCost !== undefined) {
+            fee = {
+                'cost': feeCost,
+                'currency': code,
+            };
+        }
+        return {
+            'info': transaction,
+            'id': id,
+            'txid': txid,
+            'timestamp': timestamp,
+            'datetime': this.iso8601(timestamp),
+            'network': network,
+            'address': undefined,
+            'addressTo': addressTo,
+            'addressFrom': addressFrom,
+            'tag': tag,
+            'tagTo': undefined,
+            'tagFrom': undefined,
+            'type': undefined,
+            'amount': amount,
+            'currency': code,
+            'status': status,
+            'updated': undefined,
+            'internal': internal,
+            'comment': undefined,
+            'fee': fee,
+        };
+    }
+    parseTransactionStatus(status) {
+        const statuses = {
+            'cancelled': 'cancelled',
+            'confirmed': 'ok',
+            'declined': 'declined',
+            'expired': 'expired',
+            'initiated': 'initiated',
+            'pending': 'pending',
+            'refunded': 'refunded',
+            'information required': 'pending',
+        };
+        return this.safeString(statuses, status, status);
+    }
+    /**
+     * @method
+     * @name backpack#fetchDepositAddress
+     * @description fetch the deposit address for a currency associated with this account
+     * @see https://docs.backpack.exchange/#tag/Capital/operation/get_deposit_address
+     * @param {string} code unified currency code
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.networkCode] the network to fetch the deposit address (mandatory)
+     * @returns {object} an [address structure]{@link https://docs.ccxt.com/?id=address-structure}
+     */
+    async fetchDepositAddress(code, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const [networkCode, paramsNetworkCode] = this.handleNetworkCodeAndParams(params);
+        if (networkCode === undefined) {
+            throw new errors.ArgumentsRequired(this.id + ' fetchDepositAddress() requires a network parameter, see https://docs.ccxt.com/?id=network-codes');
+        }
+        const currency = this.currency(code);
+        const request = {
+            'blockchain': this.networkCodeToId(networkCode, this.safeString(currency, 'code')),
+        };
+        const response = await this.privateGetWapiV1CapitalDepositAddress(this.extend(request, paramsNetworkCode));
+        return this.parseDepositAddress(response, currency);
+    }
+    parseDepositAddress(depositAddress, currency = undefined) {
+        //
+        //     {
+        //         "address": "0xfBe7CbfCde93c8a4204a4be6B56732Eb32690170"
+        //     }
+        //
+        const address = this.safeString(depositAddress, 'address');
+        const currencyId = this.safeString(depositAddress, 'currency');
+        const currencyResolved = this.safeCurrency(currencyId, currency);
+        return {
+            'info': depositAddress,
+            'currency': currencyResolved['code'],
+            'network': undefined, // network is not returned by the API
+            'address': address,
+            'tag': undefined,
+        };
+    }
+    /**
+     * @method
+     * @name backpack#createOrder
+     * @description creates a venue order or bounded requester RFQ for a tokenized stock
+     * @see https://docs.backpack.exchange/#tag/Order/operation/execute_order
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/submit_rfq
+     * @param {string} symbol unified symbol of the market to create an order in
+     * @param {string} type 'market' or 'limit'
+     * @param {string} side 'buy' or 'sell'
+     * @param {float} amount quantity in base currency, RFQs require base quantity
+     * @param {float} [price] limit price, ignored for venue market orders but an optional execution bound for market RFQs
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {float} [params.cost] venue market orders only, quote-currency cost instead of amount
+     * @param {boolean} [params.stock] selects tokenized stock spot or RFQ execution; inferred from symbol when omitted
+     * @param {string} [params.executionMode] RFQ only, Immediate (default) or AwaitAccept for manually accepted limit RFQs
+     * @param {int} [params.orderExpiryTime] RFQ only, resting Immediate RFQ expiry in milliseconds
+     * @param {int} [params.clientOrderId] a unique id for the order
+     * @param {boolean} [params.postOnly] venue orders only, true to place a post only order
+     * @param {string} [params.timeInForce] venue orders only, GTC, IOC, FOK or PO
+     * @param {bool} [params.reduceOnly] contracts only, reduces a position
+     * @param {string} [params.selfTradePrevention] venue orders only, EXPIRE_MAKER, EXPIRE_TAKER or EXPIRE_BOTH
+     * @param {bool} [params.autoLend] lend if required
+     * @param {bool} [params.autoLendRedeem] redeem a lend if required
+     * @param {bool} [params.autoBorrow] borrow if required
+     * @param {bool} [params.autoBorrowRepay] repay a borrow if required
+     * @param {float} [params.triggerPrice] venue orders only, trigger price
+     * @param {object} [params.takeProfit] swap markets only, attached take profit order
+     * @param {float} [params.takeProfit.triggerPrice] take profit trigger price
+     * @param {float} [params.takeProfit.price] take profit limit price, omitted for a market order
+     * @param {object} [params.stopLoss] swap markets only, attached stop loss order
+     * @param {float} [params.stopLoss.triggerPrice] stop loss trigger price
+     * @param {float} [params.stopLoss.price] stop loss limit price, omitted for a market order
+     * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    async createOrder(symbol, type, side, amount, price = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const market = this.market(symbol);
+        const selection = this.handleStockParams('createOrder', params, market);
+        const query = this.safeDict(selection, 1, {});
+        const orderParams = this.extend(query, { 'stock': this.safeBool(selection, 0, false) });
+        if (this.safeString(market['info'], 'marketType') === 'RFQ') {
+            const rfqResponse = await this.createRfqOrder(symbol, type, side, amount, price, orderParams);
+            const rfqOrder = this.safeDict({ 'order': rfqResponse }, 'order');
+            return rfqOrder;
+        }
+        const orderRequest = this.createOrderRequest(symbol, type, side, amount, price, orderParams);
+        const response = await this.privatePostApiV1Order(orderRequest);
+        return this.parseOrder(response, market);
+    }
+    /**
+     * @ignore
+     * @method
+     * @name backpack#createRfqOrder
+     * @description submits a base-quantity RFQ, with explicit market orders using an indicative execution bound
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/submit_rfq
+     * @param {string} symbol unified RFQ market symbol
+     * @param {string} type market or limit
+     * @param {string} side buy or sell
+     * @param {float} amount base quantity
+     * @param {float} [price] required limit price, or optional market execution bound
+     * @param {object} [params] extra exchange-specific parameters
+     * @param {string} [params.executionMode] Immediate (default and required) to enforce the execution price bound
+     * @param {int} [params.orderExpiryTime] exchange-specific resting RFQ expiry in milliseconds
+     * @param {int} [params.clientOrderId] requester client identifier
+     * @returns {object} an [order structure](https://docs.ccxt.com/#/?id=order-structure)
+     */
+    async createRfqOrder(symbol, type, side, amount, price = undefined, params = {}) {
+        await this.loadMarkets();
+        const market = this.market(symbol);
+        const selection = this.handleStockParams('createRfqOrder', params, market);
+        const paramsResolved = this.safeDict(selection, 1, {});
+        if (this.safeString(market['info'], 'marketType') !== 'RFQ') {
+            throw new errors.BadSymbol(this.id + ' createRfqOrder() requires an RFQ market');
+        }
+        if ((type !== 'market') && (type !== 'limit')) {
+            throw new errors.InvalidOrder(this.id + ' createOrder() RFQs support market or limit orders only');
+        }
+        if ((side !== 'buy') && (side !== 'sell')) {
+            throw new errors.InvalidOrder(this.id + ' createOrder() requires buy or sell');
+        }
+        if ((amount === undefined) || !Precise["default"].stringGt(this.numberToString(amount), '0')) {
+            throw new errors.InvalidOrder(this.id + ' createOrder() RFQs require a positive base quantity');
+        }
+        const unsupported = ['cost', 'quoteQuantity', 'postOnly', 'triggerPrice', 'stopLossPrice', 'takeProfitPrice', 'stopLoss', 'takeProfit', 'reduceOnly', 'timeInForce', 'selfTradePrevention'];
+        for (let i = 0; i < unsupported.length; i++) {
+            const key = unsupported[i];
+            if (key in paramsResolved) {
+                throw new errors.NotSupported(this.id + ' createOrder() RFQs do not support ' + key);
+            }
+        }
+        const executionMode = this.safeString(paramsResolved, 'executionMode', 'Immediate');
+        if (executionMode !== 'Immediate') {
+            throw new errors.NotSupported(this.id + ' createOrder() requires Immediate RFQs to enforce the price bound; AwaitAccept has no engine-enforced limit price');
+        }
+        const quantity = this.numberToString(amount);
+        const precision = this.safeDict(market, 'precision', {});
+        if (this.safeNumber(precision, 'amount') !== undefined) {
+            const preciseQuantity = this.amountToPrecision(symbol, amount);
+            if (!Precise["default"].stringEq(quantity, preciseQuantity)) {
+                throw new errors.InvalidOrder(this.id + ' createOrder() RFQ quantity must match the share increment without rounding');
+            }
+        }
+        let limitPrice = this.numberToString(price);
+        if (type === 'limit') {
+            if ((limitPrice === undefined) || !Precise["default"].stringGt(limitPrice, '0')) {
+                throw new errors.InvalidOrder(this.id + ' createOrder() limit RFQs require a positive price');
+            }
+        }
+        if (market['stock'] === true) {
+            const indicative = await this.fetchStockIndicativeQuote(symbol, side, amount, { 'stock': false });
+            const indicativePrice = this.safeString(indicative, 'price');
+            if (!this.safeBool(indicative, 'available', false) || (indicativePrice === undefined)) {
+                throw new errors.InvalidOrder(this.id + ' createOrder() stock indicative quote unavailable: ' + this.safeString(indicative, 'reason', 'priceUnavailable'));
+            }
+            if ((type === 'market') && (limitPrice === undefined)) {
+                limitPrice = indicativePrice;
+            }
+            const quantityFilter = this.safeDict(indicative, 'quantityFilter', {});
+            const stepSize = this.safeString(quantityFilter, 'stepSize');
+            const minimum = this.safeString(quantityFilter, 'minQuantity');
+            const maximum = this.safeString(quantityFilter, 'maxQuantity');
+            if ((minimum === undefined) || (stepSize === undefined) || !Precise["default"].stringGt(stepSize, '0')) {
+                throw new errors.InvalidOrder(this.id + ' createOrder() stock indicative quote is missing valid session quantity constraints');
+            }
+            if (((minimum !== undefined) && Precise["default"].stringLt(quantity, minimum)) || ((maximum !== undefined) && Precise["default"].stringGt(quantity, maximum)) || ((stepSize !== undefined) && !Precise["default"].stringEq(Precise["default"].stringMod(quantity, stepSize), '0'))) {
+                throw new errors.InvalidOrder(this.id + ' createOrder() quantity does not match the current stock session constraints');
+            }
+        }
+        else if (limitPrice === undefined) {
+            throw new errors.ArgumentsRequired(this.id + ' createOrder() crypto market RFQs require an explicit price bound');
+        }
+        if ((limitPrice !== undefined) && !Precise["default"].stringGt(limitPrice, '0')) {
+            throw new errors.InvalidOrder(this.id + ' createOrder() RFQ price must be positive');
+        }
+        if ((this.safeInteger(params, 'orderExpiryTime') !== undefined) && (executionMode !== 'Immediate')) {
+            throw new errors.InvalidOrder(this.id + ' createOrder() resting RFQs require Immediate execution');
+        }
+        const request = { 'symbol': market['id'], 'side': this.encodeOrderSide(side), 'quantity': quantity, 'price': limitPrice, 'executionMode': executionMode };
+        const clientOrderId = this.safeInteger(params, 'clientOrderId');
+        if (clientOrderId !== undefined) {
+            request['clientId'] = clientOrderId;
+        }
+        const query = this.omit(paramsResolved, 'clientOrderId');
+        const response = await this.privatePostApiV1Rfq(this.extend(query, request));
+        const order = this.parseOrder(response, market);
+        order['type'] = type;
+        return order;
+    }
+    /**
+     * @ignore
+     * @method
+     * @name backpack#acceptRfqQuote
+     * @description explicitly accepts a selected current best quote, which may bind funds before settlement
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/accept_quote
+     * @param {string} id requester RFQ identifier
+     * @param {string} quoteId selected quote identifier
+     * @param {string} symbol unified RFQ market symbol
+     * @param {object} [params] extra exchange-specific parameters
+     * @returns {object} an [order structure](https://docs.ccxt.com/#/?id=order-structure)
+     */
+    async acceptRfqQuote(id, quoteId, symbol, params = {}) {
+        await this.loadMarkets();
+        const market = this.market(symbol);
+        const selection = this.handleStockParams('acceptRfqQuote', params, market);
+        const query = this.safeDict(selection, 1, {});
+        if (this.safeString(market['info'], 'marketType') !== 'RFQ') {
+            throw new errors.BadSymbol(this.id + ' acceptRfqQuote() requires an RFQ market');
+        }
+        const request = { 'rfqId': id, 'quoteId': quoteId };
+        const response = await this.privatePostApiV1RfqAccept(this.extend(query, request));
+        return this.parseOrder(response, market);
+    }
+    /**
+     * @method
+     * @name backpack#createOrders
+     * @description creates venue order-book orders, RFQ batches are not supported
+     * @see https://docs.backpack.exchange/#tag/Order/operation/execute_order_batch
+     * @param {Array} orders list of orders to create, each object should contain the parameters required by createOrder, namely symbol, type, side, amount, price and params
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] selects tokenized stock spot execution for all orders, otherwise inferred per symbol
+     * @returns {object[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    async createOrders(orders, params = {}) {
+        const selection = this.handleStockParams('createOrders', params);
+        const query = this.safeDict(selection, 1, {});
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const ordersRequests = [];
+        const stock = this.safeBool(selection, 0, false);
+        for (let i = 0; i < orders.length; i++) {
+            const rawOrder = this.safeDict(orders, i);
+            const marketId = this.safeString(rawOrder, 'symbol');
+            const type = this.safeString(rawOrder, 'type');
+            const side = this.safeString(rawOrder, 'side');
+            const amount = this.safeNumber(rawOrder, 'amount');
+            const price = this.safeNumber(rawOrder, 'price');
+            const orderParams = this.safeDict(rawOrder, 'params', {});
+            const baseParams = {};
+            if (stock || !this.safeBool2(params, 'stock', 'defaultStock', true)) {
+                baseParams['stock'] = stock;
+            }
+            const baseQuery = this.extend(baseParams, query);
+            const extendedParams = this.extend(baseQuery, orderParams);
+            const orderRequest = this.createOrderRequest(marketId, type, side, amount, price, extendedParams);
+            ordersRequests.push(orderRequest);
+        }
+        const response = await this.privatePostApiV1Orders(ordersRequests);
+        return this.parseOrders(response);
+    }
+    /**
+     * @ignore
+     * @method
+     * @name backpack#createOrderRequest
+     * @description builds a venue order-book request and rejects RFQ batch execution
+     * @param {string} symbol unified market symbol
+     * @param {string} type order type
+     * @param {string} side order side
+     * @param {float} amount base quantity
+     * @param {float} [price] limit price
+     * @param {object} [params] exchange-specific order parameters
+     * @returns {object} venue order payload
+     */
+    createOrderRequest(symbol, type, side, amount, price = undefined, params = {}) {
+        if (type === undefined) {
+            throw new errors.ArgumentsRequired(this.id + ' requires a type argument');
+        }
+        if (side === undefined) {
+            throw new errors.ArgumentsRequired(this.id + ' requires a side argument');
+        }
+        const market = this.market(symbol);
+        const selection = this.handleStockParams('createOrder', params, market);
+        const query = this.safeDict(selection, 1, {});
+        if (this.safeString(market['info'], 'marketType') === 'RFQ') {
+            throw new errors.NotSupported(this.id + ' createOrders() does not support RFQ batches; use createOrder()');
+        }
+        const request = {
+            'symbol': market['id'],
+            'side': this.encodeOrderSide(side),
+            'orderType': this.capitalize(type),
+        };
+        const triggerPrice = this.safeString(query, 'triggerPrice');
+        const isTriggerOrder = triggerPrice !== undefined;
+        let quantityKey = 'quantity';
+        if (isTriggerOrder) {
+            quantityKey = 'triggerQuantity';
+        }
+        const omitKeys = [];
+        if (type === 'limit') {
+            request['price'] = this.priceToPrecision(symbol, price);
+            request[quantityKey] = this.amountToPrecision(symbol, amount);
+        }
+        else if (type === 'market') {
+            const cost = this.safeString2(query, 'cost', 'quoteQuantity');
+            if (cost !== undefined) {
+                request['quoteQuantity'] = this.costToPrecision(symbol, cost);
+                omitKeys.push('cost');
+                omitKeys.push('quoteQuantity');
+            }
+            else {
+                request[quantityKey] = this.amountToPrecision(symbol, amount);
+            }
+        }
+        if (isTriggerOrder) {
+            request['triggerPrice'] = this.priceToPrecision(symbol, triggerPrice);
+            omitKeys.push('triggerPrice');
+        }
+        const clientOrderId = this.safeInteger(query, 'clientOrderId');
+        if (clientOrderId !== undefined) {
+            request['clientId'] = clientOrderId;
+            omitKeys.push('clientOrderId');
+        }
+        const [postOnly, paramsPostOnly] = this.handlePostOnly(type === 'market', false, this.omit(query, omitKeys));
+        if (postOnly) {
+            paramsPostOnly['postOnly'] = true;
+        }
+        const bracketKeys = [];
+        const takeProfit = this.safeDict(paramsPostOnly, 'takeProfit');
+        if (takeProfit !== undefined) {
+            const takeProfitTriggerPrice = this.safeString(takeProfit, 'triggerPrice');
+            if (takeProfitTriggerPrice !== undefined) {
+                request['takeProfitTriggerPrice'] = this.priceToPrecision(symbol, takeProfitTriggerPrice);
+            }
+            const takeProfitPrice = this.safeString(takeProfit, 'price');
+            if (takeProfitPrice !== undefined) {
+                request['takeProfitLimitPrice'] = this.priceToPrecision(symbol, takeProfitPrice);
+            }
+            bracketKeys.push('takeProfit');
+        }
+        const stopLoss = this.safeDict(paramsPostOnly, 'stopLoss');
+        if (stopLoss !== undefined) {
+            const stopLossTriggerPrice = this.safeString(stopLoss, 'triggerPrice');
+            if (stopLossTriggerPrice !== undefined) {
+                request['stopLossTriggerPrice'] = this.priceToPrecision(symbol, stopLossTriggerPrice);
+            }
+            const stopLossPrice = this.safeString(stopLoss, 'price');
+            if (stopLossPrice !== undefined) {
+                request['stopLossLimitPrice'] = this.priceToPrecision(symbol, stopLossPrice);
+            }
+            bracketKeys.push('stopLoss');
+        }
+        const [selfTradePrevention, paramsSelfTradePrevention] = this.handleOptionStringAndParams(this.omit(paramsPostOnly, bracketKeys), 'createOrder', 'selfTradePrevention');
+        if (selfTradePrevention !== undefined) {
+            if (selfTradePrevention === 'EXPIRE_MAKER') {
+                request['selfTradePrevention'] = 'RejectMaker';
+            }
+            else if (selfTradePrevention === 'EXPIRE_TAKER') {
+                request['selfTradePrevention'] = 'RejectTaker';
+            }
+            else if (selfTradePrevention === 'EXPIRE_BOTH') {
+                request['selfTradePrevention'] = 'RejectBoth';
+            }
+        }
+        return this.extend(request, paramsSelfTradePrevention);
+    }
+    encodeOrderSide(side) {
+        const sides = {
+            'buy': 'Bid',
+            'sell': 'Ask',
+        };
+        return this.safeString(sides, side, side);
+    }
+    /**
+     * @method
+     * @name backpack#fetchOpenOrders
+     * @description fetches open venue orders or RFQs with their candidate quotes
+     * @see https://docs.backpack.exchange/#tag/Order/operation/get_open_orders
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/get_open_rfqs
+     * @param {string} symbol unified market symbol
+     * @param {int} [since] the earliest time in ms to fetch open orders for
+     * @param {int} [limit] the maximum number of open orders structures to retrieve
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] selects tokenized stock orders; inferred from symbol when provided, otherwise selects both venue/RFQ records
+     * @param {boolean} [params.rfq] selects requester RFQs only, inferred from RFQ symbols
+     * @param {boolean} [params.deferredSettlement] selects deferred or immediate RFQ records
+     * @returns {Order[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    async fetchOpenOrders(symbol = undefined, since = undefined, limit = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const request = {};
+        let market = undefined;
+        if (symbol !== undefined) {
+            market = this.market(symbol);
+            request['symbol'] = this.safeString(market, 'id');
+        }
+        const selection = this.handleStockParams('fetchOpenOrders', params, market);
+        const stock = this.safeBool(selection, 0, false);
+        const query = this.safeDict(selection, 1, {});
+        const rfq = this.safeBool(query, 'rfq', false) || (this.safeString(this.safeDict(market, 'info'), 'marketType') === 'RFQ');
+        if (rfq && (market !== undefined) && (this.safeString(market['info'], 'marketType') !== 'RFQ')) {
+            throw new errors.BadSymbol(this.id + ' fetchOpenOrders() rfq requires an RFQ market symbol');
+        }
+        const accountParams = this.omit(query, 'rfq');
+        let response = [];
+        if (!rfq) {
+            const venueParams = this.omit(accountParams, ['rfqId', 'deferredSettlement']);
+            response = await this.privateGetApiV1Orders(this.extend(request, venueParams));
+        }
+        if (rfq || (stock && (market === undefined))) {
+            const rfqResponse = await this.privateGetApiV1Rfqs(this.extend(request, this.omit(accountParams, 'marketType')));
+            response = this.arrayConcat(response, rfqResponse);
+        }
+        let orders = this.parseOrders(response, market, since);
+        if (stock) {
+            orders = this.filterStockStructures(orders);
+        }
+        return this.filterBySinceLimit(this.sortBy(orders, 'timestamp'), since, limit);
+    }
+    /**
+     * @method
+     * @name backpack#fetchOpenOrder
+     * @description fetches an open venue order or requester RFQ by identifier
+     * @see https://docs.backpack.exchange/#tag/Order/operation/get_order
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/get_open_rfqs
+     * @param {string} id order or requester RFQ identifier
+     * @param {string} symbol unified market symbol, required
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] selects tokenized stock orders; inferred from symbol when omitted
+     * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    async fetchOpenOrder(id, symbol = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        if (symbol === undefined) {
+            throw new errors.ArgumentsRequired(this.id + ' fetchOpenOrder() requires a symbol argument');
+        }
+        const market = this.market(symbol);
+        const selection = this.handleStockParams('fetchOpenOrder', params, market);
+        const query = this.safeDict(selection, 1, {});
+        if (this.safeString(market['info'], 'marketType') === 'RFQ') {
+            const rfqResponse = await this.privateGetApiV1Rfqs(this.extend(query, { 'symbol': market['id'], 'rfqId': id }));
+            for (let i = 0; i < rfqResponse.length; i++) {
+                const order = this.parseOrder(this.safeDict(rfqResponse, i, {}), market);
+                if (order['id'] === id) {
+                    return order;
+                }
+            }
+            throw new errors.OrderNotFound(this.id + ' fetchOpenOrder() RFQ ' + id + ' not found');
+        }
+        const request = {
+            'symbol': market['id'],
+            'orderId': id,
+        };
+        const response = await this.privateGetApiV1Order(this.extend(request, query));
+        return this.parseOrder(response, market);
+    }
+    /**
+     * @method
+     * @name backpack#fetchOrder
+     * @description fetches an order from filtered history with an open-order fallback
+     * @see https://docs.backpack.exchange/#tag/History
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/get_rfq_history
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/get_open_rfqs
+     * @param {string} id order or requester RFQ identifier
+     * @param {string} symbol unified market symbol
+     * @param {object} [params] extra exchange-specific parameters
+     * @param {boolean} [params.stock] selects tokenized stock orders; inferred from symbol when omitted
+     * @returns {object} an [order structure](https://docs.ccxt.com/#/?id=order-structure)
+     */
+    async fetchOrder(id, symbol = undefined, params = {}) {
+        if (symbol === undefined) {
+            throw new errors.ArgumentsRequired(this.id + ' fetchOrder() requires a symbol argument');
+        }
+        await this.loadMarkets();
+        const market = this.market(symbol);
+        const selection = this.handleStockParams('fetchOrder', params, market);
+        const query = this.safeDict(selection, 1, {});
+        const rfq = this.safeString(market['info'], 'marketType') === 'RFQ';
+        const request = { 'symbol': market['id'] };
+        if (rfq) {
+            request['rfqId'] = id;
+        }
+        else {
+            request['orderId'] = id;
+        }
+        let response = [];
+        if (rfq) {
+            response = await this.privateGetWapiV1HistoryRfq(this.extend(query, request));
+        }
+        else {
+            response = await this.privateGetWapiV1HistoryOrders(this.extend(query, request));
+        }
+        for (let i = 0; i < response.length; i++) {
+            const order = this.parseOrder(this.safeDict(response, i, {}), market);
+            if (order['id'] === id) {
+                return order;
+            }
+        }
+        const openOrderParams = this.extend(query, { 'stock': this.safeBool(selection, 0, false) });
+        return await this.fetchOpenOrder(id, symbol, openOrderParams);
+    }
+    /**
+     * @method
+     * @name backpack#cancelOrder
+     * @description cancels a venue order or requests RFQ cancellation without assuming immediate cancellation
+     * @see https://docs.backpack.exchange/#tag/Order/operation/cancel_order
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/cancel_rfq
+     * @param {string} id order or requester RFQ identifier
+     * @param {string} symbol unified symbol of the market the order was made in
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] selects tokenized stock orders; inferred from symbol when omitted
+     * @param {int} [params.clientOrderId] RFQ client identifier instead of id
+     * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    async cancelOrder(id, symbol = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        if (symbol === undefined) {
+            throw new errors.ArgumentsRequired(this.id + ' cancelOrder() requires a symbol argument');
+        }
+        const market = this.market(symbol);
+        const selection = this.handleStockParams('cancelOrder', params, market);
+        const query = this.safeDict(selection, 1, {});
+        if (this.safeString(market['info'], 'marketType') === 'RFQ') {
+            const clientOrderId = this.safeInteger(query, 'clientOrderId');
+            const rfqRequest = {};
+            if (clientOrderId === undefined) {
+                rfqRequest['rfqId'] = id;
+            }
+            else {
+                rfqRequest['clientId'] = clientOrderId;
+            }
+            const rfqResponse = await this.privatePostApiV1RfqCancel(this.extend(this.omit(query, 'clientOrderId'), rfqRequest));
+            return this.parseOrder(rfqResponse, market);
+        }
+        const request = {
+            'orderId': id,
+            'symbol': market['id'],
+        };
+        const response = await this.privateDeleteApiV1Order(this.extend(request, query));
+        return this.parseOrder(response, market);
+    }
+    /**
+     * @method
+     * @name backpack#cancelAllOrders
+     * @description cancels venue orders, bulk RFQ cancellation is not supported
+     * @see https://docs.backpack.exchange/#tag/Order/operation/cancel_open_orders
+     * @see https://docs.backpack.exchange/#tag/RFQ
+     * @param {string} symbol unified market symbol, required
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] selects tokenized stock orders; inferred from symbol when omitted
+     * @returns {object[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    async cancelAllOrders(symbol = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        if (symbol === undefined) {
+            throw new errors.ArgumentsRequired(this.id + ' cancelAllOrders() requires a symbol argument');
+        }
+        const market = this.market(symbol);
+        const selection = this.handleStockParams('cancelAllOrders', params, market);
+        const query = this.safeDict(selection, 1, {});
+        if (this.safeString(market['info'], 'marketType') === 'RFQ') {
+            throw new errors.NotSupported(this.id + ' cancelAllOrders() does not support RFQs; cancel each RFQ explicitly with cancelOrder()');
+        }
+        const request = {
+            'symbol': market['id'],
+        };
+        const response = await this.privateDeleteApiV1Orders(this.extend(request, query));
+        return this.parseOrders(response, market);
+    }
+    /**
+     * @method
+     * @name backpack#fetchOrders
+     * @description fetches venue or requester RFQ order history
+     * @see https://docs.backpack.exchange/#tag/History/operation/get_order_history
+     * @see https://docs.backpack.exchange/#tag/RFQ/operation/get_rfq_history
+     * @param {string} [symbol] unified market symbol of the market orders were made in
+     * @param {int} [since] the earliest time in ms to fetch orders for, locally filtered on retrieved pages
+     * @param {int} [limit] the maximum number of order structures to retrieve (default 100, max 1000)
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.stock] selects tokenized stock orders; inferred from symbol when provided, otherwise selects both venue/RFQ records
+     * @param {boolean} [params.rfq] selects requester RFQ history only, inferred from RFQ symbols
+     * @param {int} [params.offset] exchange history pagination offset
+     * @param {string} [params.sortDirection] Asc or Desc
+     * @param {boolean} [params.deferredSettlement] selects deferred or immediate RFQ history
+     * @returns {Order[]} a list of [order structures]{@link https://github.com/ccxt/ccxt/wiki/Manual#order-structure}
+     */
+    async fetchOrders(symbol = undefined, since = undefined, limit = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const request = {};
+        let market = undefined;
+        if (symbol !== undefined) {
+            market = this.market(symbol);
+            request['symbol'] = this.safeString(market, 'id');
+        }
+        if (limit !== undefined) {
+            request['limit'] = limit;
+        }
+        const selection = this.handleStockParams('fetchOrders', params, market);
+        const stock = this.safeBool(selection, 0, false);
+        const query = this.safeDict(selection, 1, {});
+        const rfq = this.safeBool(query, 'rfq', false) || (this.safeString(this.safeDict(market, 'info'), 'marketType') === 'RFQ');
+        if (rfq && (market !== undefined) && (this.safeString(market['info'], 'marketType') !== 'RFQ')) {
+            throw new errors.BadSymbol(this.id + ' fetchOrders() rfq requires an RFQ market symbol');
+        }
+        const accountParams = this.omit(query, 'rfq');
+        let response = [];
+        if (!rfq) {
+            const venueParams = this.omit(accountParams, ['rfqId', 'status', 'side', 'deferredSettlement']);
+            response = await this.privateGetWapiV1HistoryOrders(this.extend(request, venueParams));
+        }
+        if (rfq || (stock && (market === undefined))) {
+            const rfqResponse = await this.privateGetWapiV1HistoryRfq(this.extend(request, this.omit(accountParams, 'marketType')));
+            response = this.arrayConcat(response, rfqResponse);
+        }
+        let orders = this.parseOrders(response, market, since);
+        if (stock) {
+            orders = this.filterStockStructures(orders);
+        }
+        return this.filterBySinceLimit(this.sortBy(orders, 'timestamp'), since, limit);
+    }
+    parseOrder(order, market = undefined) {
+        const rfq = this.safeDict(order, 'rfq');
+        if (rfq !== undefined) {
+            const parsed = this.parseOrder(rfq, market);
+            parsed['info'] = order;
+            return parsed;
+        }
+        //
+        //     {
+        //         "clientId": null,
+        //         "createdAt": 1753624283415,
+        //         "executedQuantity": "0.001",
+        //         "executedQuoteQuantity": "3.81428",
+        //         "id": "4227701917",
+        //         "orderType": "Market",
+        //         "quantity": "0.001",
+        //         "quoteQuantity": "3.82",
+        //         "reduceOnly": null,
+        //         "relatedOrderId": null,
+        //         "selfTradePrevention": "RejectTaker",
+        //         "side": "Bid",
+        //         "status": "Filled",
+        //         "stopLossLimitPrice": null,
+        //         "stopLossTriggerBy": null,
+        //         "stopLossTriggerPrice": null,
+        //         "strategyId": null,
+        //         "symbol": "ETH_USDC",
+        //         "takeProfitLimitPrice": null,
+        //         "takeProfitTriggerBy": null,
+        //         "takeProfitTriggerPrice": null,
+        //         "timeInForce": "GTC",
+        //         "triggerBy": null,
+        //         "triggerPrice": null,
+        //         "triggerQuantity": null,
+        //         "triggeredAt": null
+        //     }
+        //
+        // fetchOpenOrders
+        //     {
+        //         "clientId": 123456789,
+        //         "createdAt": 1753626206762,
+        //         "executedQuantity": "0",
+        //         "executedQuoteQuantity": "0",
+        //         "id": "4228978331",
+        //         "orderType": "Limit",
+        //         "postOnly": true,
+        //         "price": "3000",
+        //         "quantity": "0.001",
+        //         "reduceOnly": null,
+        //         "relatedOrderId": null,
+        //         "selfTradePrevention": "RejectTaker",
+        //         "side": "Bid",
+        //         "status": "New",
+        //         "stopLossLimitPrice": null,
+        //         "stopLossTriggerBy": null,
+        //         "stopLossTriggerPrice": null,
+        //         "strategyId": null,
+        //         "symbol": "ETH_USDC",
+        //         "systemOrderType": null,
+        //         "takeProfitLimitPrice": null,
+        //         "takeProfitTriggerBy": null,
+        //         "takeProfitTriggerPrice": null,
+        //         "timeInForce": "GTC",
+        //         "triggerBy": null,
+        //         "triggerPrice": null,
+        //         "triggerQuantity": null,
+        //         "triggeredAt": null
+        //     }
+        //
+        // fetchOrders
+        //     {
+        //         "clientId": null,
+        //         "createdAt": "2025-07-27T18:05:40.897",
+        //         "executedQuantity": "0",
+        //         "executedQuoteQuantity": "0",
+        //         "expiryReason": null,
+        //         "id": "4239996998",
+        //         "orderType": "Limit",
+        //         "postOnly": false,
+        //         "price": "4500",
+        //         "quantity": null,
+        //         "quoteQuantity": null,
+        //         "selfTradePrevention": "RejectTaker",
+        //         "side": "Ask",
+        //         "status": "Cancelled",
+        //         "stopLossLimitPrice": null,
+        //         "stopLossTriggerBy": null,
+        //         "stopLossTriggerPrice": null,
+        //         "strategyId": null,
+        //         "symbol": "ETH_USDC",
+        //         "systemOrderType": null,
+        //         "takeProfitLimitPrice": null,
+        //         "takeProfitTriggerBy": null,
+        //         "takeProfitTriggerPrice": null,
+        //         "timeInForce": "GTC",
+        //         "triggerBy": null,
+        //         "triggerPrice": "4300",
+        //         "triggerQuantity": "0.001"
+        //     }
+        //
+        let timestamp = this.safeInteger(order, 'createdAt');
+        const timestamp2 = this.parse8601(this.safeString(order, 'createdAt'));
+        if (timestamp2 !== undefined) {
+            timestamp = timestamp2;
+        }
+        const id = this.safeString2(order, 'id', 'rfqId');
+        const clientOrderId = this.safeString(order, 'clientId');
+        const marketId = this.safeString(order, 'symbol');
+        const marketResolved = this.safeMarket(marketId, market);
+        const symbol = this.safeSymbol(marketId, marketResolved);
+        let type = this.safeStringLower(order, 'orderType');
+        if ((type === undefined) && (this.safeString(order, 'rfqId') !== undefined) && (this.safeString(order, 'price') !== undefined)) {
+            type = 'limit';
+        }
+        const timeInForce = this.safeString(order, 'timeInForce');
+        const side = this.parseOrderSide(this.safeString(order, 'side'));
+        const amount = this.safeString2(order, 'quantity', 'triggerQuantity');
+        const price = this.safeString(order, 'price');
+        const cost = this.safeString(order, 'executedQuoteQuantity');
+        const status = this.parseOrderStatus(this.safeString(order, 'status'));
+        const triggerPrice = this.safeString(order, 'triggerPrice');
+        const filled = this.safeString(order, 'executedQuantity');
+        const reduceOnly = this.safeBool(order, 'reduceOnly');
+        const postOnly = this.safeBool(order, 'postOnly');
+        const stopLossPrice = this.safeString2(order, 'stopLossLimitPrice', 'stopLossTriggerPrice');
+        const takeProfitPrice = this.safeString2(order, 'takeProfitLimitPrice', 'takeProfitTriggerPrice');
+        return this.safeOrder({
+            'info': order,
+            'id': id,
+            'clientOrderId': clientOrderId,
+            'timestamp': timestamp,
+            'datetime': this.iso8601(timestamp),
+            'lastTradeTimestamp': undefined,
+            'symbol': symbol,
+            'type': type,
+            'timeInForce': timeInForce,
+            'postOnly': postOnly,
+            'reduceOnly': reduceOnly,
+            'side': side,
+            'price': price,
+            'triggerPrice': triggerPrice,
+            'stopLossPrice': stopLossPrice,
+            'takeProfitPrice': takeProfitPrice,
+            'amount': amount,
+            'cost': cost,
+            'average': undefined,
+            'filled': filled,
+            'remaining': undefined,
+            'status': status,
+            'fee': undefined,
+            'trades': undefined,
+        }, marketResolved);
+    }
+    parseOrderStatus(status) {
+        const statuses = {
+            'New': 'open',
+            'Filled': 'closed',
+            'Cancelled': 'canceled',
+            'Expired': 'canceled',
+            'PartiallyFilled': 'open',
+            'TriggerPending': 'open',
+            'TriggerFailed': 'rejected',
+        };
+        return this.safeString(statuses, status, status);
+    }
+    parseOrderSide(side) {
+        const sides = {
+            'Bid': 'buy',
+            'Ask': 'sell',
+        };
+        return this.safeString(sides, side, side);
+    }
+    /**
+     * @method
+     * @name backpack#fetchPositions
+     * @description fetches derivative positions
+     * @see https://docs.backpack.exchange/#tag/Futures/operation/get_positions
+     * @param {string[]|undefined} symbols list of unified market symbols
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object[]} a list of [position structure]{@link https://docs.ccxt.com/?id=position-structure}
+     */
+    async fetchPositions(symbols = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const response = await this.privateGetApiV1Position(params);
+        if (this.isEmpty(symbols)) {
+            return this.parsePositions(response);
+        }
+        const symbolsNormalized = this.marketSymbols(symbols);
+        return this.parsePositions(response, symbolsNormalized);
+    }
+    parsePosition(position, market = undefined) {
+        //
+        // fetchPositions
+        //     {
+        //         "breakEvenPrice": "3831.3630555555555555555555556",
+        //         "cumulativeFundingPayment": "-0.009218",
+        //         "cumulativeInterest": "0",
+        //         "entryPrice": "3826.8888888888888888888888889",
+        //         "estLiquidationPrice": "0",
+        //         "imf": "0.02",
+        //         "imfFunction": {
+        //             "base": "0.02",
+        //             "factor": "0.0000935",
+        //             "type": "sqrt"
+        //         },
+        //         "markPrice": "3787.46813304",
+        //         "mmf": "0.0125",
+        //         "mmfFunction": {
+        //             "base": "0.0125",
+        //             "factor": "0.0000561",
+        //             "type": "sqrt"
+        //         },
+        //         "netCost": "13.7768",
+        //         "netExposureNotional": "13.634885278944",
+        //         "netExposureQuantity": "0.0036",
+        //         "netQuantity": "0.0036",
+        //         "pnlRealized": "0",
+        //         "pnlUnrealized": "-0.141914",
+        //         "positionId": "4238420454",
+        //         "subaccountId": null,
+        //         "symbol": "ETH_USDC_PERP",
+        //         "userId":1813870
+        //     }
+        //
+        const id = this.safeString(position, 'positionId');
+        const marketId = this.safeString(position, 'symbol');
+        const marketResolved = this.safeMarket(marketId, market);
+        const symbol = marketResolved['symbol'];
+        const entryPrice = this.safeNumber(position, 'entryPrice');
+        const markPrice = this.safeNumber(position, 'markPrice');
+        const netCost = this.safeString(position, 'netCost');
+        let hedged = false;
+        let side = 'long';
+        if (Precise["default"].stringLt(netCost, '0')) {
+            side = 'short';
+        }
+        if (netCost === undefined) {
+            hedged = undefined;
+            side = undefined;
+        }
+        const unrealizedPnl = this.safeNumber(position, 'pnlUnrealized');
+        const realizedPnl = this.safeNumber(position, 'pnlRealized');
+        const liquidationPrice = this.safeNumber(position, 'estLiquidationPrice');
+        return this.safePosition({
+            'info': position,
+            'id': id,
+            'symbol': symbol,
+            'timestamp': this.parse8601(this.safeString(position, 'timestamp')),
+            'datetime': this.iso8601(this.parse8601(this.safeString(position, 'timestamp'))),
+            'lastUpdateTimestamp': undefined,
+            'hedged': hedged,
+            'side': side,
+            'contracts': this.safeNumber(position, 'netExposureQuantity'),
+            'contractSize': undefined,
+            'entryPrice': entryPrice,
+            'markPrice': markPrice,
+            'lastPrice': undefined,
+            'notional': this.parseNumber(Precise["default"].stringAbs(netCost)),
+            'leverage': undefined,
+            'collateral': undefined,
+            'initialMargin': undefined,
+            'initialMarginPercentage': this.safeNumber(position, 'imf'),
+            'maintenanceMargin': undefined,
+            'maintenanceMarginPercentage': this.safeNumber(position, 'mmf'),
+            'realizedPnl': realizedPnl,
+            'unrealizedPnl': unrealizedPnl,
+            'liquidationPrice': liquidationPrice,
+            'marginMode': undefined,
+            'marginRatio': undefined,
+            'percentage': undefined,
+            'stopLossPrice': undefined,
+            'takeProfitPrice': undefined,
+        });
+    }
+    /**
+     * @method
+     * @name backpack#fetchFundingHistory
+     * @description fetches the history of funding payments
+     * @see https://docs.backpack.exchange/#tag/History/operation/get_funding_payments
+     * @param {string} symbol unified symbol of the market to fetch trades for
+     * @param {int} [since] timestamp in ms of the earliest trade to fetch (default 24 hours ago)
+     * @param {int} [limit] the maximum amount of trades to fetch (default 200, max 500)
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {int} [params.until] timestamp in ms of the latest trade to fetch (default now)
+     * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=public-trades}
+     */
+    async fetchFundingHistory(symbol = undefined, since = undefined, limit = undefined, params = {}) {
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const request = {};
+        let market = undefined;
+        if (symbol !== undefined) {
+            market = this.market(symbol);
+            request['symbol'] = this.safeString(market, 'id');
+        }
+        if (limit !== undefined) {
+            request['limit'] = limit;
+        }
+        const response = await this.privateGetWapiV1HistoryFunding(this.extend(request, params));
+        return this.parseIncomes(response, market, since, limit);
+    }
+    parseIncome(income, market = undefined) {
+        //
+        //     {
+        //         "fundingRate": "0.0001",
+        //         "intervalEndTimestamp": "2025-08-01T16:00:00",
+        //         "quantity": "-0.001301",
+        //         "subaccountId": 0,
+        //         "symbol": "ETH_USDC_PERP",
+        //         "userId": 1813870
+        //     }
+        //
+        const marketId = this.safeString(income, 'symbol');
+        const symbol = this.safeSymbol(marketId, market);
+        const amount = this.safeNumber(income, 'quantity');
+        const id = this.safeString(income, 'userId');
+        const timestamp = this.parse8601(this.safeString(income, 'intervalEndTimestamp'));
+        const rate = this.safeNumber(income, 'fundingRate');
+        return {
+            'info': income,
+            'symbol': symbol,
+            'code': undefined,
+            'timestamp': timestamp,
+            'datetime': this.iso8601(timestamp),
+            'id': id,
+            'amount': amount,
+            'rate': rate,
+        };
+    }
+    nonce() {
+        const timeDifference = this.safeInteger(this.options, 'timeDifference');
+        if (timeDifference === undefined) {
+            throw new errors.ExchangeError(this.id + ' nonce() requires a numeric options["timeDifference"]');
+        }
+        return this.milliseconds() - timeDifference;
+    }
+    sign(path, api = ['public'], method = 'GET', params = {}) {
+        const apiName = api[0];
+        let endpoint = '/' + path;
+        const apiUrl = this.safeString(this.urls['api'], apiName);
+        if (apiUrl === undefined) {
+            throw new errors.ExchangeError(this.id + ' sign() has no API URL for this endpoint');
+        }
+        const requestParams = Array.isArray(params) ? params : this.omit(params, ['stock', 'defaultStock', 'rfq', 'callerMethodName']);
+        const sortedParams = Array.isArray(requestParams) ? requestParams : this.keysort(requestParams);
+        let headersSigned = {};
+        let bodySigned = undefined;
+        if (apiName === 'private') {
+            this.checkRequiredCredentials();
+            const ts = this.numberToString(this.nonce());
+            const recvWindow = this.safeString2(this.options, 'recvWindow', 'X-Window', '5000');
+            const optionInstructions = this.safeDict(this.options, 'instructions', {});
+            const optionPathInstructions = this.safeDict(optionInstructions, path, {});
+            const instruction = this.safeString(optionPathInstructions, method, '');
+            let payload = '';
+            if ((path === 'api/v1/orders') && (method === 'POST')) { // for createOrders
+                payload = this.generateBatchPayload(sortedParams, ts, recvWindow, instruction);
+            }
+            else {
+                let queryString = this.urlencode(sortedParams);
+                if (queryString.length > 0) {
+                    queryString += '&';
+                }
+                payload = 'instruction=' + instruction + '&' + queryString + 'timestamp=' + ts + '&window=' + recvWindow;
+            }
+            const secretBytes = this.base64ToBinary(this.secret);
+            const seed = this.arraySlice(secretBytes, 0, 32);
+            const signature = crypto.eddsa(this.encode(payload), seed, ed25519_js.ed25519);
+            headersSigned = {
+                'X-Timestamp': ts,
+                'X-Window': recvWindow,
+                'X-API-Key': this.apiKey,
+                'X-Signature': signature,
+                'X-Broker-Id': '1400',
+            };
+            if (method !== 'GET') {
+                bodySigned = this.json(sortedParams);
+                headersSigned['Content-Type'] = 'application/json';
+            }
+        }
+        if (method === 'GET') {
+            const query = this.urlencodeWithArrayRepeat(sortedParams);
+            if (query.length !== 0) {
+                endpoint += '?' + query;
+            }
+        }
+        const url = apiUrl + endpoint;
+        const headersResolved = (apiName === 'private') ? headersSigned : undefined;
+        let bodyResolved = undefined;
+        if ((apiName === 'private') && (method !== 'GET')) {
+            bodyResolved = bodySigned;
+        }
+        return { 'url': url, 'method': method, 'body': bodyResolved, 'headers': headersResolved };
+    }
+    generateBatchPayload(params, ts, recvWindow, instruction) {
+        let payload = '';
+        const paramsLength = params.length;
+        for (let i = 0; i < paramsLength; i++) {
+            const order = this.safeDict(params, i, {});
+            const sortedOrder = this.keysort(order);
+            const orderQuery = this.urlencode(sortedOrder);
+            payload += 'instruction=' + instruction + '&' + orderQuery + '&';
+            if (i === (paramsLength - 1)) {
+                payload += 'timestamp=' + ts + '&window=' + recvWindow;
+            }
+        }
+        return payload;
+    }
+    handleErrors(code, reason, url, method, headers, body, response, requestHeaders, requestBody) {
+        if (response === undefined) {
+            return undefined; // fallback to default error handler
+        }
+        //
+        // {"code":"INVALID_ORDER","message":"Invalid order"}
+        // {"code":"INVALID_CLIENT_REQUEST","message":"Must specify both `triggerPrice` and `triggerQuantity` or neither"}
+        //
+        const errorCode = this.safeString(response, 'code');
+        const message = this.safeString(response, 'message');
+        if (errorCode !== undefined) {
+            const feedback = this.id + ' ' + body;
+            this.throwExactlyMatchedException(this.exceptions['exact'], errorCode, feedback);
+            this.throwExactlyMatchedException(this.exceptions['exact'], message, feedback);
+            this.throwBroadlyMatchedException(this.exceptions['broad'], message, feedback);
+            throw new errors.ExchangeError(feedback); // unknown message
+        }
+        return undefined;
+    }
+}
+
+exports["default"] = backpack;

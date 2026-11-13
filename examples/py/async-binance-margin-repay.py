@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 from pprint import pprint
@@ -11,10 +14,8 @@ sys.path.append(root + '/python')
 import ccxt.async_support as ccxt  # noqa: E402
 
 
-async def main(asyncio_loop):
+async def main():
     exchange = ccxt.binance({
-        'asyncio_loop': asyncio_loop,
-        'enableRateLimit': True,
         'apiKey': 'YOUR_API_KEY',
         'secret': 'YOUR_SECRET',
         'verbose': True,  # for debug output
@@ -34,6 +35,5 @@ async def main(asyncio_loop):
         print(e)
     await exchange.close()
 
-if __name__ == '__main__':
-    asyncio_loop = asyncio.get_event_loop()
-    asyncio_loop.run_until_complete(main(asyncio_loop))
+
+run(main())

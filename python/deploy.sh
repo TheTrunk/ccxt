@@ -1,2 +1,2 @@
-python setup.py sdist bdist_wheel
-twine upload dist/* -u x84 -p ${PYPI_PASSWORD}
+cd "$(dirname "$0")/.." && python -m build --outdir python/dist
+twine upload python/dist/* -u __token__ -p ${PYPI_TOKEN}

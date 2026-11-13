@@ -1,0 +1,330 @@
+package ccxt
+
+import (
+	"encoding/json"
+	"fmt"
+	"reflect"
+	"regexp"
+	"sort"
+)
+
+// keysort sorts the keys of a map and returns a new map with the sorted keys.
+// func (this *BaseExchange) Keysort(parameters2 any) map[string]any {
+// 	parameters := parameters2.(map[string]any)
+// 	keys := make([]string, 0, len(parameters))
+// 	for k := range parameters {
+// 		keys = append(keys, k)
+// 	}
+// 	sort.Strings(keys)
+
+// 	outDict := make(map[string]any)
+// 	for _, key := range keys {
+// 		outDict[key] = parameters[key]
+// 	}
+// 	return outDict
+// }
+
+func (this *BaseExchange) Keysort(parameters2 any) map[string]any {
+	var tempMap map[string]any
+
+	switch v := parameters2.(type) {
+	case map[string]any:
+		tempMap = v
+
+	default:
+		// Unsupported type; return empty map
+		return map[string]any{}
+	}
+
+	keys := make([]string, 0, len(tempMap))
+	for k := range tempMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	outDict := make(map[string]any, len(keys))
+	for _, key := range keys {
+		outDict[key] = tempMap[key]
+	}
+	return outDict
+}
+
+func (this *BaseExchange) Sort(input any) []any {
+	list := []any{}
+
+	switch v := input.(type) {
+	case []string:
+		for _, item := range v {
+			list = append(list, item)
+		}
+	case []any:
+		// typed-pointer elements (*string from SafeStringPtr) sort and return by value, as in JS
+		for _, item := range v {
+			list = append(list, derefScalar(item))
+		}
+	default:
+		return []any{}
+	}
+
+	sort.Slice(list, func(i, j int) bool {
+		ai, aok := toFloat64(list[i])
+		bi, bok := toFloat64(list[j])
+		if aok && bok {
+			return ai < bi
+		}
+		return fmt.Sprintf("%v", list[i]) < fmt.Sprintf("%v", list[j])
+	})
+	return list
+}
+
+func toFloat64(v any) (float64, bool) {
+	switch n := v.(type) {
+	case int:
+		return float64(n), true
+	case int32:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case float32:
+		return float64(n), true
+	case float64:
+		return n, true
+	}
+	return 0, false
+}
+
+// omit removes specified keys from a map.
+// func (this *BaseExchange) Omit(a any, parameters ...any) any {
+// 	if len(parameters) == 1 {
+// 		// maybe we got []any as the only variadic argument, handle it
+// 		if reflect.TypeOf(parameters[0]).Kind() == reflect.Slice {
+// 			return this.OmitN(a, parameters[0].([]any))
+// 		}
+// 	}
+// 	keys := make([]any, len(parameters))
+// 	for i, parameter := range parameters {
+// 		keys[i] = parameter
+// 	}
+// 	return this.OmitMap(a, keys)
+// }
+
+func (this *BaseExchange) Omit(a any, parameters ...any) any {
+	if len(parameters) == 1 {
+		// Handle single argument which could be a slice of various types
+		switch keys := parameters[0].(type) {
+		case []any:
+			return this.OmitN(a, keys)
+		case []string:
+			// Convert []string to []any
+			interfaceKeys := make([]any, len(keys))
+			for i, key := range keys {
+				interfaceKeys[i] = key
+			}
+			return this.OmitN(a, interfaceKeys)
+		}
+	}
+
+	// Handle variadic parameters as individual keys
+	keys := make([]any, len(parameters))
+	copy(keys, parameters)
+	return this.OmitMap(a, keys)
+}
+
+// OmitDict is Omit for a map argument: the result is always a fresh map (a nil map yields an empty one).
+func (this *BaseExchange) OmitDict(a map[string]any, parameters ...any) map[string]any {
+	return this.Omit(a, parameters...).(map[string]any)
+}
+
+// omitMap removes specified keys from a map.
+func (this *BaseExchange) OmitMap(aa any, k any) any {
+	aa = derefScalar(aa) // a typed-nil container is absent, like untyped nil
+	// if reflect.TypeOf(aa).Kind() == reflect.Slice {
+	// 	return aa
+	// 	//  if ok {
+	// 	// 	 return res
+	// 	//  }
+	// 	//  return
+	// }
+
+	switch aa.(type) {
+	case []any, []string, []bool, []int, []int64, []float64, []map[string]any:
+		return aa
+	}
+
+	// Handle case where aa is not a map (e.g., string, nil, etc.)
+	if aa == nil {
+		return aa
+	}
+
+	// Try to convert to map, if it fails, return the original value
+	a, ok := aa.(map[string]any)
+	if !ok {
+		// If it's not a map, return the original value
+		return aa
+	}
+
+	var keys []any
+	switch k.(type) {
+	case string:
+		// keys = []string{k.(string)}
+	case []any:
+		for _, v := range k.([]any) {
+			keys = append(keys, derefScalar(v).(string))
+		}
+	}
+
+	outDict := make(map[string]any)
+	for key, value := range a {
+		if !this.Contains(keys, key) {
+			outDict[key] = value
+		}
+	}
+	return outDict
+}
+
+// omitN removes specified keys from a map.
+func (this *BaseExchange) OmitN(aa any, keys []any) any {
+	aa = derefScalar(aa)
+	outDict := make(map[string]any)
+	a, ok := aa.(map[string]any)
+	if ok {
+		for key, value := range a {
+			if !this.Contains(keys, key) {
+				outDict[key] = value
+			}
+		}
+		return outDict
+	}
+	return aa
+}
+
+// contains checks if a slice contains a specific element.
+func (this *BaseExchange) Contains(slice []any, elem string) bool {
+	for _, s := range slice {
+		if derefScalar(s).(string) == elem {
+			return true
+		}
+	}
+	return false
+}
+
+func (this *BaseExchange) ToArray(a any) []any {
+	// SafeList and friends can hand over a typed pointer
+	a = derefScalar(a)
+	if a == nil {
+		return nil
+	}
+
+	// Check if `a` is a slice of `[]any`
+	if slice, ok := a.([]any); ok {
+		return slice
+	}
+
+	// Check if `a` implements IArrayCache interface (handles all cache types)
+	if cache, ok := a.(IArrayCache); ok {
+		return cache.ToArray()
+	}
+
+	// Check if `a` is a map of `map[string]any`
+	if m, ok := a.(map[string]any); ok {
+		outList := make([]any, 0, len(m))
+		for _, value := range m {
+			outList = append(outList, value)
+		}
+		return outList
+	}
+
+	// Unsupported type
+	return nil
+}
+
+// arrayConcat concatenates two slices. Elements are copied through reflection so any slice type
+// works (e.g. ObjectKeys returns []string in Go, which a direct .([]any) assertion would panic on).
+// TS `arrayConcat (a: any[], b: any[])` is always an array, so the Go twin reports `[]any`
+// instead of boxing it back into `any` (nil when an operand is not a slice, as before).
+func (this *BaseExchange) ArrayConcat(aa, bb any) []any {
+	aa, bb = derefScalar(aa), derefScalar(bb)
+	if aa != nil && bb != nil && reflect.TypeOf(aa).Kind() == reflect.Slice && reflect.TypeOf(bb).Kind() == reflect.Slice {
+		va := reflect.ValueOf(aa)
+		vb := reflect.ValueOf(bb)
+		outList := make([]any, 0, va.Len()+vb.Len())
+		for i := 0; i < va.Len(); i++ {
+			outList = append(outList, va.Index(i).Interface())
+		}
+		for i := 0; i < vb.Len(); i++ {
+			outList = append(outList, vb.Index(i).Interface())
+		}
+		return outList
+	}
+	return nil
+}
+
+// aggregate is a stub function that returns an empty slice.
+// func (this *BaseExchange) Aggregate(bidasks any) []any {
+// 	var outList []any
+// 	return outList
+// }
+
+func (this *BaseExchange) Aggregate(bidasks any) []any {
+	result := make(map[float64]float64)
+
+	for _, pair := range bidasks.([][]any) {
+		if len(pair) >= 2 {
+			price := ToFloat64(pair[0])
+			volume := ToFloat64(pair[1])
+			result[price] += volume
+		}
+	}
+
+	// Convert map back to [][]any
+	res := make([]any, 0, len(result))
+	for price, volume := range result {
+		res = append(res, []any{price, volume})
+	}
+
+	return res
+}
+
+func (this *BaseExchange) ExtractParams(str2 any) []any {
+	str := derefScalar(str2).(string)
+	// Compile the regular expression
+	regex := regexp.MustCompile(`\{([^\}]+)\}`)
+
+	// Find all matches
+	matches := regex.FindAllStringSubmatch(str, -1)
+
+	// Create a list to store the extracted parameters
+	outList := make([]any, 0, len(matches))
+
+	// Iterate over the matches and add the captured groups to the list
+	for _, match := range matches {
+		if len(match) > 1 {
+			outList = append(outList, match[1])
+		}
+	}
+
+	return outList
+}
+
+func Json(obj any) string {
+	if obj == nil {
+		return ""
+	}
+
+	// Check if the object is an error (Go's equivalent of an exception)
+	if err, ok := obj.(error); ok {
+		// Create an anonymous struct with the error type name
+		errorObj := struct {
+			Name string `json:"name"`
+		}{
+			Name: reflect.TypeOf(err).Name(),
+		}
+		// Serialize the error object to JSON
+		jsonData, _ := json.Marshal(errorObj)
+		return string(jsonData)
+	}
+
+	// Serialize the object to JSON
+	jsonData, _ := json.Marshal(obj)
+	return string(jsonData)
+}

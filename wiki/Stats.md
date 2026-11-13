@@ -38,16 +38,19 @@
 ![GitHub language count](https://img.shields.io/github/languages/count/ccxt/ccxt.svg)
 ![GitHub contributors](https://img.shields.io/github/contributors/ccxt/ccxt.svg)
 
+<!--
+
 ### GitHub Search Hits
 
 ![GitHub search hit counter](https://img.shields.io/github/search/ccxt/ccxt/binance.svg)
 ![GitHub search hit counter](https://img.shields.io/github/search/ccxt/ccxt/bitmex.svg)
-![GitHub search hit counter](https://img.shields.io/github/search/ccxt/ccxt/bittrex.svg)
 ![GitHub search hit counter](https://img.shields.io/github/search/ccxt/ccxt/coinbase.svg)
 ![GitHub search hit counter](https://img.shields.io/github/search/ccxt/ccxt/gdax.svg)
 ![GitHub search hit counter](https://img.shields.io/github/search/ccxt/ccxt/kraken.svg)
 ![GitHub search hit counter](https://img.shields.io/github/search/ccxt/ccxt/poloniex.svg)
 ![GitHub search hit counter](https://img.shields.io/github/search/ccxt/ccxt/kucoin.svg)
+
+-->
 
 ## Opencollective
 

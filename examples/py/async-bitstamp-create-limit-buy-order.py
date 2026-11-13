@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 
@@ -15,7 +18,6 @@ async def test():
     exchange = ccxt.bitstamp({
         'apiKey': 'YOUR_API_KEY',
         'secret': 'YOUR_SECRET',
-        'enableRateLimit': True,  # this is required, as documented in the Manual!
     })
 
     response = None
@@ -43,5 +45,5 @@ async def test():
     await exchange.close()
     return response
 
-if __name__ == '__main__':
-    print(asyncio.get_event_loop().run_until_complete(test()))
+
+print(run(test()))

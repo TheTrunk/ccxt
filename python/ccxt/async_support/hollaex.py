@@ -4,61 +4,125 @@
 # https://github.com/ccxt/ccxt/blob/master/CONTRIBUTING.md#how-to-contribute-code
 
 from ccxt.async_support.base.exchange import Exchange
+from ccxt.abstract.hollaex import ImplicitAPI
+import hashlib
+from ccxt.base.types import Balances, Currencies, Currency, CurrencyInterface, DepositAddress, Int, Market, Num, Order, OrderBook, OrderSide, OrderType, Str, Strings, Ticker, Tickers, OrderBooks, Trade, TradingFees, DepositWithdrawFees, Transaction
+from ccxt.base.errors import ExchangeError
 from ccxt.base.errors import AuthenticationError
 from ccxt.base.errors import ArgumentsRequired
 from ccxt.base.errors import BadRequest
 from ccxt.base.errors import InsufficientFunds
 from ccxt.base.errors import OrderNotFound
+from ccxt.base.errors import OrderImmediatelyFillable
 from ccxt.base.errors import NetworkError
+from ccxt.base.errors import InvalidNonce
 from ccxt.base.decimal_to_precision import TICK_SIZE
+from ccxt.base.precise import Precise
 
 
-class hollaex(Exchange):
+class hollaex(Exchange, ImplicitAPI):
 
-    def describe(self):
+    def describe(self) -> dict:
         return self.deep_extend(super(hollaex, self).describe(), {
             'id': 'hollaex',
             'name': 'HollaEx',
             'countries': ['KR'],
-            'rateLimit': 333,
-            'version': 'v1',
+            # 4 requests per second => 1000ms / 4 = 250 ms between requests
+            'rateLimit': 250,
+            'version': 'v2',
+            'pro': True,
             'has': {
-                'CORS': False,
-                'fetchMarkets': True,
-                'fetchCurrencies': True,
-                'fetchTicker': True,
-                'fetchTickers': True,
-                'fetchOrderBook': True,
-                'fetchOrderBooks': True,
-                'fetchTrades': True,
-                'fetchOHLCV': True,
-                'fetchBalance': True,
-                'createOrder': True,
+                'CORS': None,
+                'spot': True,
+                'margin': None,
+                'swap': False,
+                'future': False,
+                'option': False,
+                'addMargin': False,
+                'cancelAllOrders': True,
+                'cancelOrder': True,
                 'createLimitBuyOrder': True,
                 'createLimitSellOrder': True,
                 'createMarketBuyOrder': True,
                 'createMarketSellOrder': True,
-                'cancelOrder': True,
-                'cancelAllOrders': True,
-                'fetchOpenOrders': True,
-                'fetchClosedOrders': False,
-                'fetchOpenOrder': True,
-                'fetchOrder': False,
+                'createOrder': True,
+                'createPostOnlyOrder': True,
+                'createReduceOnlyOrder': False,
+                'createStopLimitOrder': True,
+                'createStopMarketOrder': True,
+                'createStopOrder': True,
+                'fetchBalance': True,
+                'fetchBorrowRateHistories': False,
+                'fetchBorrowRateHistory': False,
+                'fetchClosedOrders': True,
+                'fetchCrossBorrowRate': False,
+                'fetchCrossBorrowRates': False,
+                'fetchCurrencies': True,
+                'fetchDepositAddress': 'emulated',
+                'fetchDepositAddresses': True,
+                'fetchDepositAddressesByNetwork': False,
                 'fetchDeposits': True,
-                'fetchWithdrawals': True,
-                'fetchTransactions': False,
-                'fetchOrders': False,
+                'fetchDepositWithdrawFees': True,
+                'fetchFundingHistory': False,
+                'fetchFundingRate': False,
+                'fetchFundingRateHistory': False,
+                'fetchFundingRates': False,
+                'fetchIndexOHLCV': False,
+                'fetchIsolatedBorrowRate': False,
+                'fetchIsolatedBorrowRates': False,
+                'fetchLeverage': False,
+                'fetchMarginMode': False,
+                'fetchMarkets': True,
+                'fetchMarkOHLCV': False,
                 'fetchMyTrades': True,
+                'fetchOHLCV': True,
+                'fetchOpenInterestHistory': False,
+                'fetchOpenOrder': True,
+                'fetchOpenOrders': True,
+                'fetchOrder': True,
+                'fetchOrderBook': True,
+                'fetchOrderBooks': True,
+                'fetchOrders': True,
+                'fetchPosition': False,
+                'fetchPositionMode': False,
+                'fetchPositions': False,
+                'fetchPositionsRisk': False,
+                'fetchPremiumIndexOHLCV': False,
+                'fetchTicker': True,
+                'fetchTickers': True,
+                'fetchTrades': True,
+                'fetchTradingFee': False,
+                'fetchTradingFees': True,
+                'fetchTransactions': False,
+                'fetchTransfer': False,
+                'fetchTransfers': False,
+                'fetchWithdrawal': True,
+                'fetchWithdrawals': True,
+                'reduceMargin': False,
+                'sandbox': True,
+                'setLeverage': False,
+                'setMarginMode': False,
+                'setPositionMode': False,
+                'transfer': False,
                 'withdraw': True,
-                'fetchDepositAddress': True,
             },
             'timeframes': {
+                '1m': '1m',
+                '5m': '5m',
+                '15m': '15m',
                 '1h': '1h',
+                '4h': '4h',
                 '1d': '1d',
+                '1w': '1w',
             },
             'urls': {
                 'logo': 'https://user-images.githubusercontent.com/1294454/75841031-ca375180-5ddd-11ea-8417-b975674c23cb.jpg',
-                'api': 'https://api.hollaex.com',
+                'test': {
+                    'rest': 'https://api.sandbox.hollaex.com',
+                },
+                'api': {
+                    'rest': 'https://api.hollaex.com',
+                },
                 'www': 'https://hollaex.com',
                 'doc': 'https://apidocs.hollaex.com',
                 'referral': 'https://pro.hollaex.com/signup?affiliation_code=QSWA6G',
@@ -70,52 +134,143 @@ class hollaex(Exchange):
             },
             'api': {
                 'public': {
-                    'get': [
-                        'health',
-                        'constant',
-                        'ticker',
-                        'ticker/all',
-                        'orderbooks',
-                        'trades',
-                        'chart',
-                        # TradingView data
-                        'udf/config',
-                        'udf/history',
-                        'udf/symbols',
-                    ],
+                    'get': {
+                        'health': {'cost': 1},
+                        'constants': {'cost': 1},
+                        'kit': {'cost': 1},
+                        'tiers': {'cost': 1},
+                        'ticker': {'cost': 1},
+                        'tickers': {'cost': 1},
+                        'orderbook': {'cost': 1},
+                        'orderbooks': {'cost': 1},
+                        'trades': {'cost': 1},
+                        'chart': {'cost': 1},
+                        'charts': {'cost': 1},
+                        'minicharts': {'cost': 1},
+                        'oracle/prices': {'cost': 1},
+                        'quick-trade': {'cost': 1},
+                        # TradingView
+                        'udf/config': {'cost': 1},
+                        'udf/history': {'cost': 1},
+                        'udf/symbols': {'cost': 1},
+                    },
                 },
                 'private': {
-                    'get': [
-                        'user',
-                        'user/balance',
-                        'user/trades',
-                        'user/orders',
-                        'user/orders/{order_id}',
-                        'user/deposits',
-                        'user/withdrawals',
-                        'user/withdraw/{currency}/fee',
-                    ],
-                    'post': [
-                        'user/request-withdrawal',
-                        'order',
-                    ],
-                    'delete': [
-                        'user/orders',
-                        'user/orders/{order_id}',
-                    ],
+                    'get': {
+                        'user': {'cost': 1},
+                        'user/balance': {'cost': 1},
+                        'user/deposits': {'cost': 1},
+                        'user/withdrawals': {'cost': 1},
+                        'user/withdrawal/fee': {'cost': 1},
+                        'subaccounts': {'cost': 1},
+                        'user/trades': {'cost': 1},
+                        'orders': {'cost': 1},
+                        'order': {'cost': 1},
+                    },
+                    'post': {
+                        'user/withdrawal': {'cost': 1},
+                        'subaccount/transfer': {'cost': 1},
+                        'order': {'cost': 1},
+                    },
+                    'delete': {
+                        'order/all': {'cost': 1},
+                        'order': {'cost': 1},
+                    },
+                },
+            },
+            'features': {
+                'spot': {
+                    'sandbox': True,
+                    'createOrder': {
+                        'marginMode': False,
+                        'triggerPrice': True,
+                        'triggerPriceType': None,
+                        'triggerDirection': False,
+                        'stopLossPrice': False,  # todo
+                        'takeProfitPrice': False,  # todo
+                        'attachedStopLossTakeProfit': None,
+                        'timeInForce': {
+                            'IOC': False,
+                            'FOK': False,
+                            'PO': True,
+                            'GTD': False,
+                        },
+                        'hedged': False,
+                        'selfTradePrevention': False,
+                        'trailing': False,
+                        'leverage': False,
+                        'marketBuyByCost': False,
+                        'marketBuyRequiresPrice': False,
+                        'iceberg': False,
+                    },
+                    'createOrders': None,
+                    'fetchMyTrades': {
+                        'marginMode': False,
+                        'limit': 100,
+                        'daysBack': 100000,
+                        'untilDays': 100000,  # todo implement
+                        'symbolRequired': False,
+                    },
+                    'fetchOrder': {
+                        'marginMode': False,
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': False,
+                    },
+                    'fetchOpenOrders': {
+                        'marginMode': False,
+                        'limit': 100,
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': False,
+                    },
+                    'fetchOrders': {
+                        'marginMode': False,
+                        'limit': 100,
+                        'daysBack': 100000,  # todo
+                        'untilDays': 100000,  # todo
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': False,
+                    },
+                    'fetchClosedOrders': {
+                        'marginMode': False,
+                        'limit': 100,
+                        'daysBack': 100000,  # todo
+                        'daysBackCanceled': 1,  # todo
+                        'untilDays': 100000,  # todo
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': False,
+                    },
+                    'fetchOHLCV': {
+                        'limit': 1000,  # todo: no limit in request
+                    },
+                },
+                'swap': {
+                    'linear': None,
+                    'inverse': None,
+                },
+                'future': {
+                    'linear': None,
+                    'inverse': None,
                 },
             },
             'fees': {
                 'trading': {
                     'tierBased': True,
                     'percentage': True,
+                    'taker': 0.001,
+                    'maker': 0.001,
                 },
             },
             'exceptions': {
                 'broad': {
+                    'API request is expired': InvalidNonce,
                     'Invalid token': AuthenticationError,
                     'Order not found': OrderNotFound,
                     'Insufficient balance': InsufficientFunds,
+                    'Error 1001 - Order rejected. Order could not be submitted as self order was set to a post only order.': OrderImmediatelyFillable,
                 },
                 'exact': {
                     '400': BadRequest,
@@ -130,195 +285,356 @@ class hollaex(Exchange):
             },
             'options': {
                 # how many seconds before the authenticated request expires
-                'api-expires': int(self.timeout / 1000),
+                'api-expires': self.parse_to_int(self.parse_to_int(self.timeout) / 1000),
+                'networks': {
+                    'BTC': 'btc',
+                    'ERC20': 'eth',
+                    'TRC20': 'trx',
+                    'XRP': 'xrp',
+                    'XLM': 'xlm',
+                    'BNB': 'bnb',
+                    'MATIC': 'matic',
+                },
+                'networksById': {
+                    'eth': 'ERC20',
+                    'ETH': 'ERC20',
+                    'ERC20': 'ERC20',
+                    'trx': 'TRC20',
+                    'TRX': 'TRC20',
+                    'TRC20': 'TRC20',
+                },
             },
         })
 
-    async def fetch_markets(self, params={}):
-        response = await self.publicGetConstant(params)
+    async def fetch_markets(self, params: dict = {}) -> list[Market]:
+        """
+        retrieves data on all markets for hollaex
+
+        https://apidocs.hollaex.com/#constants
+
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict[]: an array of objects representing market data
+        """
+        response = await self.publicGetConstants(params)
         #
         #     {
-        #         coins: {
-        #             xmr: {
-        #                 id: 7,
-        #                 fullname: "Monero",
-        #                 symbol: "xmr",
-        #                 active: True,
-        #                 allow_deposit: True,
-        #                 allow_withdrawal: True,
-        #                 withdrawal_fee: 0.02,
-        #                 min: 0.001,
-        #                 max: 100000,
-        #                 increment_unit: 0.001,
-        #                 deposit_limits: {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0},
-        #                 withdrawal_limits: {'1': 10, '2': 15, '3': 100, '4': 100, '5': 200, '6': 300, '7': 350, '8': 400, '9': 500, '10': -1},
-        #                 created_at: "2019-12-09T07:14:02.720Z",
-        #                 updated_at: "2020-01-16T12:12:53.162Z"
+        #         "coins": {
+        #             "xmr": {
+        #                 "id": 7,
+        #                 "fullname": "Monero",
+        #                 "symbol": "xmr",
+        #                 "active": true,
+        #                 "allow_deposit": true,
+        #                 "allow_withdrawal": true,
+        #                 "withdrawal_fee": 0.02,
+        #                 "min": 0.001,
+        #                 "max": 100000,
+        #                 "increment_unit": 0.001,
+        #                 "deposit_limits": { '1': 0, '2': 0, '3': 0, '4': 0, "5": 0, "6": 0 },
+        #                 "withdrawal_limits": { '1': 10, '2': 15, '3': 100, '4': 100, '5': 200, '6': 300, '7': 350, '8': 400, "9": 500, "10": -1 },
+        #                 "created_at": "2019-12-09T07:14:02.720Z",
+        #                 "updated_at": "2020-01-16T12:12:53.162Z"
         #             },
-        #             # ...
+        #             // ...
         #         },
-        #         pairs: {
-        #             'btc-usdt': {
-        #                 id: 2,
-        #                 name: "btc-usdt",
-        #                 pair_base: "btc",
-        #                 pair_2: "usdt",
-        #                 taker_fees: {'1': 0.3, '2': 0.25, '3': 0.2, '4': 0.18, '5': 0.1, '6': 0.09, '7': 0.08, '8': 0.06, '9': 0.04, '10': 0},
-        #                 maker_fees: {'1': 0.1, '2': 0.08, '3': 0.05, '4': 0.03, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, '10': 0},
-        #                 min_size: 0.0001,
-        #                 max_size: 1000,
-        #                 min_price: 100,
-        #                 max_price: 100000,
-        #                 increment_size: 0.0001,
-        #                 increment_price: 0.05,
-        #                 active: True,
-        #                 created_at: "2019-12-09T07:15:54.537Z",
-        #                 updated_at: "2019-12-09T07:15:54.537Z"
+        #         "pairs": {
+        #             "btc-usdt": {
+        #                 "id": 2,
+        #                 "name": "btc-usdt",
+        #                 "pair_base": "btc",
+        #                 "pair_2": "usdt",
+        #                 "taker_fees": { '1': 0.3, '2': 0.25, '3': 0.2, '4': 0.18, '5': 0.1, '6': 0.09, '7': 0.08, '8': 0.06, "9": 0.04, "10": 0 },
+        #                 "maker_fees": { '1': 0.1, '2': 0.08, '3': 0.05, '4': 0.03, '5': 0, '6': 0, '7': 0, '8': 0, "9": 0, "10": 0 },
+        #                 "min_size": 0.0001,
+        #                 "max_size": 1000,
+        #                 "min_price": 100,
+        #                 "max_price": 100000,
+        #                 "increment_size": 0.0001,
+        #                 "increment_price": 0.05,
+        #                 "active": true,
+        #                 "created_at": "2019-12-09T07:15:54.537Z",
+        #                 "updated_at": "2019-12-09T07:15:54.537Z"
         #             },
         #         },
-        #         config: {tiers: 10},
-        #         status: True
+        #         "config": { tiers: 10 },
+        #         "status": true
         #     }
         #
-        pairs = self.safe_value(response, 'pairs', {})
+        pairs = self.safe_dict(response, 'pairs', {})
         keys = list(pairs.keys())
         result = []
         for i in range(0, len(keys)):
             key = keys[i]
-            market = pairs[key]
-            id = self.safe_string(market, 'name')
+            market = self.safe_dict(pairs, key)
             baseId = self.safe_string(market, 'pair_base')
             quoteId = self.safe_string(market, 'pair_2')
-            base = self.common_currency_code(baseId.upper())
-            quote = self.common_currency_code(quoteId.upper())
-            symbol = base + '/' + quote
-            active = self.safe_value(market, 'active')
+            baseCode = self.common_currency_code(baseId.upper())
+            quoteCode = self.common_currency_code(quoteId.upper())
             result.append({
-                'id': id,
-                'symbol': symbol,
-                'base': base,
-                'quote': quote,
+                'id': self.safe_string(market, 'name'),
+                'symbol': baseCode + '/' + quoteCode,
+                'base': baseCode,
+                'quote': quoteCode,
+                'settle': None,
                 'baseId': baseId,
                 'quoteId': quoteId,
-                'active': active,
+                'settleId': None,
+                'type': 'spot',
+                'spot': True,
+                'margin': False,
+                'swap': False,
+                'future': False,
+                'option': False,
+                'active': self.safe_bool(market, 'active'),
+                'contract': False,
+                'linear': None,
+                'inverse': None,
+                'contractSize': None,
+                'expiry': None,
+                'expiryDatetime': None,
+                'strike': None,
+                'optionType': None,
                 'precision': {
-                    'price': self.safe_float(market, 'increment_price'),
-                    'amount': self.safe_float(market, 'increment_size'),
+                    'amount': self.safe_number(market, 'increment_size'),
+                    'price': self.safe_number(market, 'increment_price'),
                 },
                 'limits': {
-                    'amount': {
-                        'min': self.safe_float(market, 'min_size'),
-                        'max': self.safe_float(market, 'max_size'),
-                    },
-                    'price': {
-                        'min': self.safe_float(market, 'min_price'),
-                        'max': self.safe_float(market, 'max_price'),
-                    },
-                    'cost': {'min': None, 'max': None},
-                },
-                'info': market,
-            })
-        return result
-
-    async def fetch_currencies(self, params={}):
-        response = await self.publicGetConstant(params)
-        coins = self.safe_value(response, 'coins', {})
-        keys = list(coins.keys())
-        result = {}
-        for i in range(0, len(keys)):
-            key = keys[i]
-            currency = coins[key]
-            id = self.safe_string(currency, 'symbol')
-            numericId = self.safe_integer(currency, 'id')
-            code = self.safe_currency_code(id)
-            name = self.safe_string(currency, 'fullname')
-            active = self.safe_value(currency, 'active')
-            fee = self.safe_float(currency, 'withdrawal_fee')
-            precision = self.safe_float(currency, 'increment_unit')
-            withdrawalLimits = self.safe_value(currency, 'withdrawal_limits', [])
-            result[code] = {
-                'id': id,
-                'numericId': numericId,
-                'code': code,
-                'info': currency,
-                'name': name,
-                'active': active,
-                'fee': fee,
-                'precision': precision,
-                'limits': {
-                    'amount': {
-                        'min': self.safe_float(currency, 'min'),
-                        'max': self.safe_float(currency, 'max'),
-                    },
-                    'price': {
+                    'leverage': {
                         'min': None,
                         'max': None,
+                    },
+                    'amount': {
+                        'min': self.safe_number(market, 'min_size'),
+                        'max': self.safe_number(market, 'max_size'),
+                    },
+                    'price': {
+                        'min': self.safe_number(market, 'min_price'),
+                        'max': self.safe_number(market, 'max_price'),
                     },
                     'cost': {
                         'min': None,
                         'max': None,
                     },
-                    'withdraw': {
-                        'min': None,
-                        'max': self.safe_value(withdrawalLimits, 0),
-                    },
                 },
-            }
+                'created': self.parse8601(self.safe_string(market, 'created_at')),
+                'info': market,
+            })
         return result
 
-    async def fetch_order_books(self, symbols=None, limit=None, params={}):
-        await self.load_markets()
+    async def fetch_currencies(self, params: dict = {}) -> Currencies:
+        """
+        fetches all available currencies on an exchange
+
+        https://apidocs.hollaex.com/#constants
+
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an associative dictionary of currencies
+        """
+        response = await self.publicGetConstants(params)
+        #
+        #    {
+        #        "coins": {
+        #            "usdt": {
+        #                "id": "6",
+        #                "fullname": "USD Tether",
+        #                "symbol": "usdt",
+        #                "active": true,
+        #                "verified": true,
+        #                "allow_deposit": true,
+        #                "allow_withdrawal": true,
+        #                "withdrawal_fee": "20",
+        #                "min": "1",
+        #                "max": "10000000",
+        #                "increment_unit": "0.0001",
+        #                "logo": "https://hollaex-resources.s3.ap-southeast-1.amazonaws.com/icons/usdt.svg",
+        #                "code": "usdt",
+        #                "is_public": true,
+        #                "meta": {
+        #                    "color": "#27a17a",
+        #                    "website": "https://tether.to",
+        #                    "explorer": "https://blockchair.com/tether",
+        #                    "decimal_points": "6"
+        #                },
+        #                "estimated_price": "1",
+        #                "description": "<p>Tether (USDT) is a stablecoin pegged 1:1 to the US dollar. It is a digital currency that aims to maintain its value while allowing for fast and secure transfer of funds. It was the first stablecoin, and is the most widely used due stablecoin due to its stability and low volatility compared to other cryptocurrencies. It was launched in 2014 by Tether Limited.</p>",
+        #                "type": "blockchain",
+        #                "network": "eth,trx,bnb,matic",
+        #                "standard": "",
+        #                "issuer": "HollaEx",
+        #                "withdrawal_fees": {
+        #                    "bnb": {
+        #                        "value": "0.8",
+        #                        "active": true,
+        #                        "symbol": "usdt"
+        #                    },
+        #                    "eth": {
+        #                        "value": "1.5",
+        #                        "active": true,
+        #                        "symbol": "usdt"
+        #                    },
+        #                    "trx": {
+        #                        "value": "4",
+        #                        "active": true,
+        #                        "symbol": "usdt"
+        #                    },
+        #                    "matic": {
+        #                        "value": "0.3",
+        #                        "active": true,
+        #                        "symbol": "usdt"
+        #                    }
+        #                },
+        #                "display_name": null,
+        #                "deposit_fees": null,
+        #                "is_risky": false,
+        #                "market_cap": "144568098696.29",
+        #                "category": "stable",
+        #                "created_at": "2019-08-09T10:45:43.367Z",
+        #                "updated_at": "2025-03-25T17:12:37.970Z",
+        #                "created_by": "168",
+        #                "owner_id": "1"
+        #            },
+        #         },
+        #         "network":"https://api.hollaex.network"
+        #     }
+        #
+        coins = self.safe_dict(response, 'coins', {})
+        values = list(coins.values())
+        return self.parse_currencies(values)
+
+    def parse_currency(self, rawCurrency: dict) -> CurrencyInterface:
+        id = self.safe_string(rawCurrency, 'symbol')
+        code = self.safe_currency_code(id)
+        withdrawalLimits = self.safe_list(rawCurrency, 'withdrawal_limits', [])
+        rawType = self.safe_string(rawCurrency, 'type')
+        type = 'other'
+        if rawType == 'blockchain':
+            type = 'crypto'
+        rawNetworks = self.safe_dict(rawCurrency, 'withdrawal_fees', {})
+        networks = {}
+        networkIds = list(rawNetworks.keys())
+        for j in range(0, len(networkIds)):
+            networkId = networkIds[j]
+            networkEntry = self.safe_dict(rawNetworks, networkId)
+            networkCode = self.network_id_to_code(networkId, code)
+            if networkCode is not None:
+                networks[networkCode] = {
+                    'id': networkId,
+                    'network': networkCode,
+                    'active': self.safe_bool(networkEntry, 'active'),
+                    'deposit': None,
+                    'withdraw': None,
+                    'fee': self.safe_number(networkEntry, 'value'),
+                    'precision': None,
+                    'limits': {
+                        'withdraw': {
+                            'min': None,
+                            'max': None,
+                        },
+                    },
+                    'info': networkEntry,
+                }
+        return self.safe_currency_structure({
+            'id': id,
+            'numericId': self.safe_integer(rawCurrency, 'id'),
+            'code': code,
+            'info': rawCurrency,
+            'name': self.safe_string(rawCurrency, 'fullname'),
+            'active': self.safe_bool(rawCurrency, 'active'),
+            'deposit': self.safe_bool(rawCurrency, 'allow_deposit'),
+            'withdraw': self.safe_bool(rawCurrency, 'allow_withdrawal'),
+            'fee': self.safe_number(rawCurrency, 'withdrawal_fee'),
+            'precision': self.safe_number(rawCurrency, 'increment_unit'),
+            'limits': {
+                'amount': {
+                    'min': self.safe_number(rawCurrency, 'min'),
+                    'max': self.safe_number(rawCurrency, 'max'),
+                },
+                'withdraw': {
+                    'min': None,
+                    'max': self.safe_number(withdrawalLimits, 0),
+                },
+            },
+            'networks': networks,
+            'type': type,
+        })
+
+    async def fetch_order_books(self, symbols: Strings = None, limit: Int = None, params: dict = {}) -> OrderBooks:
+        """
+        fetches information on open orders with bid(buy) and ask(sell) prices, volumes and other data for multiple markets
+
+        https://apidocs.hollaex.com/#orderbooks
+
+        :param str[]|None symbols: not used by fetchOrderBooks()
+        :param int [limit]: not used by fetchOrderBooks()
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a dictionary of `order book structures <https://docs.ccxt.com/?id=order-book-structure>` indexed by market symbol
+        """
+        if self.markets is None:
+            await self.load_markets()
         response = await self.publicGetOrderbooks(params)
         result = {}
         marketIds = list(response.keys())
         for i in range(0, len(marketIds)):
             marketId = marketIds[i]
-            orderbook = response[marketId]
-            symbol = marketId
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-                symbol = market['symbol']
-            else:
-                baseId, quoteId = marketId.split('-')
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
+            orderbook = self.safe_dict(response, marketId, {})
+            symbol = self.safe_symbol(marketId, None, '-')
             timestamp = self.parse8601(self.safe_string(orderbook, 'timestamp'))
-            result[symbol] = self.parse_order_book(response[marketId], timestamp)
+            result[symbol] = self.parse_order_book(orderbook, symbol, timestamp)
         return result
 
-    async def fetch_order_book(self, symbol, limit=None, params={}):
-        await self.load_markets()
-        marketId = self.market_id(symbol)
+    async def fetch_order_book(self, symbol: str, limit: Int = None, params: dict = {}) -> OrderBook:
+        """
+        fetches information on open orders with bid(buy) and ask(sell) prices, volumes and other data
+
+        https://apidocs.hollaex.com/#orderbook
+
+        :param str symbol: unified symbol of the market to fetch the order book for
+        :param int [limit]: the maximum amount of order book entries to return
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `order book structure <https://docs.ccxt.com/?id=order-book-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
+        market = self.market(symbol)
         request = {
-            'symbol': marketId,
+            'symbol': market['id'],
         }
-        response = await self.publicGetOrderbooks(self.extend(request, params))
+        response = await self.publicGetOrderbook(self.extend(request, params))
         #
         #     {
         #         "btc-usdt": {
         #             "bids": [
-        #                 [8836.4, 1.022],
-        #                 [8800, 0.0668],
-        #                 [8797.75, 0.2398],
+        #                 [ 8836.4, 1.022 ],
+        #                 [ 8800, 0.0668 ],
+        #                 [ 8797.75, 0.2398 ],
         #             ],
         #             "asks": [
-        #                 [8839.35, 1.5334],
-        #                 [8852.6, 0.0579],
-        #                 [8860.45, 0.1815],
+        #                 [ 8839.35, 1.5334 ],
+        #                 [ 8852.6, 0.0579 ],
+        #                 [ 8860.45, 0.1815 ],
         #             ],
         #             "timestamp": "2020-03-03T02:27:25.147Z"
         #         },
         #         "eth-usdt": {},
-        #         # ...
+        #         // ...
         #     }
         #
-        orderbook = self.safe_value(response, marketId)
+        orderbook = self.safe_dict(response, market['id'])
         timestamp = self.parse8601(self.safe_string(orderbook, 'timestamp'))
-        return self.parse_order_book(orderbook, timestamp)
+        return self.parse_order_book(orderbook, market['symbol'], timestamp)
 
-    async def fetch_ticker(self, symbol, params={}):
-        await self.load_markets()
+    async def fetch_ticker(self, symbol: str, params: dict = {}) -> Ticker:
+        """
+        fetches a price ticker, a statistical calculation with the information calculated over the past 24 hours for a specific market
+
+        https://apidocs.hollaex.com/#ticker
+
+        :param str symbol: unified symbol of the market to fetch the ticker for
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a `ticker structure <https://docs.ccxt.com/?id=ticker-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         market = self.market(symbol)
         request = {
             'symbol': market['id'],
@@ -326,20 +642,31 @@ class hollaex(Exchange):
         response = await self.publicGetTicker(self.extend(request, params))
         #
         #     {
-        #         open: 8615.55,
-        #         close: 8841.05,
-        #         high: 8921.1,
-        #         low: 8607,
-        #         last: 8841.05,
-        #         volume: 20.2802,
-        #         timestamp: '2020-03-03T03:11:18.964Z'
+        #         "open": 8615.55,
+        #         "close": 8841.05,
+        #         "high": 8921.1,
+        #         "low": 8607,
+        #         "last": 8841.05,
+        #         "volume": 20.2802,
+        #         "timestamp": "2020-03-03T03:11:18.965Z"
         #     }
         #
         return self.parse_ticker(response, market)
 
-    async def fetch_tickers(self, symbols=None, params={}):
-        await self.load_markets()
-        response = await self.publicGetTickerAll(self.extend(params))
+    async def fetch_tickers(self, symbols: Strings = None, params: dict = {}) -> Tickers:
+        """
+        fetches price tickers for multiple markets, statistical information calculated over the past 24 hours for each market
+
+        https://apidocs.hollaex.com/#tickers
+
+        :param str[]|None symbols: unified symbols of the markets to fetch the ticker for, all market tickers are returned if not assigned
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a dictionary of `ticker structures <https://docs.ccxt.com/?id=ticker-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
+        symbolsNormalized = self.market_symbols(symbols)
+        response = await self.publicGetTickers(params)
         #
         #     {
         #         "bch-usdt": {
@@ -352,43 +679,35 @@ class hollaex(Exchange):
         #             "volume":0.054,
         #             "symbol":"bch-usdt"
         #         },
-        #         # ...
+        #         // ...
         #     }
         #
-        return self.parse_tickers(response, symbols)
+        return self.parse_tickers(response, symbolsNormalized)
 
-    def parse_tickers(self, response, symbols=None):
+    def parse_tickers(self, tickers: object, symbols: Strings = None, params: dict = {}) -> Tickers:
         result = {}
-        keys = list(response.keys())
+        keys = list(tickers.keys())
         for i in range(0, len(keys)):
             key = keys[i]
-            ticker = response[key]
-            symbol = key
-            market = None
+            ticker = self.safe_value(tickers, key)
             marketId = self.safe_string(ticker, 'symbol', key)
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-                symbol = market['symbol']
-            else:
-                baseId, quoteId = marketId.split('-')
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
-            result[symbol] = self.parse_ticker(ticker, market)
-        return self.filter_by_array(result, 'symbol', symbols)
+            market = self.safe_market(marketId, None, '-')
+            symbol = market['symbol']
+            result[symbol] = self.extend(self.parse_ticker(ticker, market), params)
+        return self.filter_by_array_tickers(result, 'symbol', symbols)
 
-    def parse_ticker(self, ticker, market=None):
+    def parse_ticker(self, ticker: dict, market: Market = None) -> Ticker:
         #
         # fetchTicker
         #
         #     {
-        #         open: 8615.55,
-        #         close: 8841.05,
-        #         high: 8921.1,
-        #         low: 8607,
-        #         last: 8841.05,
-        #         volume: 20.2802,
-        #         timestamp: '2020-03-03T03:11:18.964Z',
+        #         "open": 8615.55,
+        #         "close": 8841.05,
+        #         "high": 8921.1,
+        #         "low": 8607,
+        #         "last": 8841.05,
+        #         "volume": 20.2802,
+        #         "timestamp": "2020-03-03T03:11:18.964Z",
         #     }
         #
         # fetchTickers
@@ -404,47 +723,48 @@ class hollaex(Exchange):
         #         "symbol": "bch-usdt"
         #     }
         #
-        symbol = None
         marketId = self.safe_string(ticker, 'symbol')
-        if marketId is not None:
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-                symbol = market['symbol']
-            else:
-                baseId, quoteId = marketId.split('-')
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
-        if (symbol is None) and (market is not None):
-            symbol = market['symbol']
+        marketResolved = self.safe_market(marketId, market, '-')
+        symbol = marketResolved['symbol']
         timestamp = self.parse8601(self.safe_string_2(ticker, 'time', 'timestamp'))
-        close = self.safe_float(ticker, 'close')
-        result = {
+        close = self.safe_string(ticker, 'close')
+        return self.safe_ticker({
             'symbol': symbol,
             'info': ticker,
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
-            'high': self.safe_float(ticker, 'high'),
-            'low': self.safe_float(ticker, 'low'),
+            'high': self.safe_string(ticker, 'high'),
+            'low': self.safe_string(ticker, 'low'),
             'bid': None,
             'bidVolume': None,
             'ask': None,
             'askVolume': None,
             'vwap': None,
-            'open': self.safe_float(ticker, 'open'),
+            'open': self.safe_string(ticker, 'open'),
             'close': close,
-            'last': self.safe_float(ticker, 'last', close),
+            'last': self.safe_string(ticker, 'last', close),
             'previousClose': None,
             'change': None,
             'percentage': None,
             'average': None,
-            'baseVolume': self.safe_float(ticker, 'volume'),
+            'baseVolume': self.safe_string(ticker, 'volume'),
             'quoteVolume': None,
-        }
-        return result
+        }, marketResolved)
 
-    async def fetch_trades(self, symbol, since=None, limit=None, params={}):
-        await self.load_markets()
+    async def fetch_trades(self, symbol: str, since: Int = None, limit: Int = None, params: dict = {}) -> list[Trade]:
+        """
+        get the list of most recent trades for a particular symbol
+
+        https://apidocs.hollaex.com/#trades
+
+        :param str symbol: unified symbol of the market to fetch trades for
+        :param int [since]: timestamp in ms of the earliest trade to fetch
+        :param int [limit]: the maximum amount of trades to fetch
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Trade[]: a list of `trade structures <https://docs.ccxt.com/?id=public-trades>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         market = self.market(symbol)
         request = {
             'symbol': market['id'],
@@ -459,16 +779,16 @@ class hollaex(Exchange):
         #                 "side": "buy",
         #                 "timestamp": "2020-03-03T04:44:33.034Z"
         #             },
-        #             # ...
+        #             // ...
         #         ]
         #     }
         #
-        trades = await self.safe_value(response, market['id'], [])
+        trades = self.safe_list(response, market['id'], [])
         return self.parse_trades(trades, market, since, limit)
 
-    def parse_trade(self, trade, market=None):
+    def parse_trade(self, trade: dict, market: Market = None) -> Trade:
         #
-        # fetchTrades(public)
+        # fetchTrades (public)
         #
         #     {
         #         "size": 0.5,
@@ -477,90 +797,149 @@ class hollaex(Exchange):
         #         "timestamp": "2020-03-03T04:44:33.034Z"
         #     }
         #
-        # fetchMyTrades(private)
+        # fetchMyTrades (private)
+        #  {
+        #      "side":"sell",
+        #      "symbol":"doge-usdt",
+        #      "size":70,
+        #      "price":0.147411,
+        #      "timestamp":"2022-01-26T17:53:34.650Z",
+        #      "order_id":"cba78ecb-4187-4da2-9d2f-c259aa693b5a",
+        #      "fee":0.01031877,
+        #      "fee_coin":"usdt"
+        #  }
         #
-        #     {
-        #         "side": "buy",
-        #         "symbol": "eth-usdt",
-        #         "size": 0.086,
-        #         "price": 226.19,
-        #         "timestamp": "2020-03-03T08:03:55.459Z",
-        #         "fee": 0.1
-        #     }
-        #
-        symbol = None
         marketId = self.safe_string(trade, 'symbol')
-        quote = None
-        if marketId is not None:
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-                symbol = market['symbol']
-            else:
-                baseId, quoteId = marketId.split('-')
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
-        if (symbol is None) and (market is not None):
-            symbol = market['symbol']
+        marketResolved = self.safe_market(marketId, market, '-')
+        symbol = marketResolved['symbol']
         datetime = self.safe_string(trade, 'timestamp')
         timestamp = self.parse8601(datetime)
         side = self.safe_string(trade, 'side')
-        price = self.safe_float(trade, 'price')
-        amount = self.safe_float(trade, 'size')
-        cost = None
-        if price is not None:
-            if amount is not None:
-                cost = price * amount
-        feeCost = self.safe_float(trade, 'fee')
+        orderId = self.safe_string(trade, 'order_id')
+        priceString = self.safe_string(trade, 'price')
+        amountString = self.safe_string(trade, 'size')
+        feeCostString = self.safe_string(trade, 'fee')
+        feeCoin = self.safe_string(trade, 'fee_coin')
         fee = None
-        if feeCost is not None:
-            feeCurrencyCode = market['quote'] if (market is not None) else quote
+        if feeCostString is not None:
             fee = {
-                'cost': feeCost,
-                'currency': feeCurrencyCode,
+                'cost': feeCostString,
+                'currency': self.safe_currency_code(feeCoin),
             }
-        result = {
+        return self.safe_trade({
             'info': trade,
             'id': None,
             'timestamp': timestamp,
             'datetime': datetime,
             'symbol': symbol,
-            'order': None,
+            'order': orderId,
             'type': None,
             'side': side,
             'takerOrMaker': None,
-            'price': price,
-            'amount': amount,
-            'cost': cost,
+            'price': priceString,
+            'amount': amountString,
+            'cost': None,
             'fee': fee,
-        }
+        }, marketResolved)
+
+    async def fetch_trading_fees(self, params: dict = {}) -> TradingFees:
+        """
+        fetch the trading fees for multiple markets
+
+        https://apidocs.hollaex.com/#tiers
+
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a dictionary of `fee structures <https://docs.ccxt.com/?id=fee-structure>` indexed by market symbols
+        """
+        if self.markets is None:
+            await self.load_markets()
+        response = await self.publicGetTiers(params)
+        #
+        #     {
+        #         "1": {
+        #             "id": "1",
+        #             "name": "Silver",
+        #             "icon": '',
+        #             "description": "Your crypto journey starts here! Make your first deposit to start trading, and verify your account to level up!",
+        #             "deposit_limit": "0",
+        #             "withdrawal_limit": "1000",
+        #             "fees": {
+        #                 "maker": {
+        #                     'eth-btc': "0.1",
+        #                     'ada-usdt': "0.1",
+        #                     ...
+        #                 },
+        #                 "taker": {
+        #                     'eth-btc': "0.1",
+        #                     'ada-usdt': "0.1",
+        #                     ...
+        #                 }
+        #             },
+        #             "note": "<ul>\n<li>Login and verify email</li>\n</ul>\n",
+        #             "created_at": "2021-03-22T03:51:39.129Z",
+        #             "updated_at": "2021-11-01T02:51:56.214Z"
+        #         },
+        #         ...
+        #     }
+        #
+        firstTier = self.safe_dict(response, '1', {})
+        fees = self.safe_dict(firstTier, 'fees', {})
+        makerFees = self.safe_dict(fees, 'maker', {})
+        takerFees = self.safe_dict(fees, 'taker', {})
+        result = {}
+        symbols = self.symbols
+        for i in range(0, len(symbols)):
+            symbol = symbols[i]
+            market = self.market(symbol)
+            makerString = self.safe_string(makerFees, market['id'])
+            takerString = self.safe_string(takerFees, market['id'])
+            result[symbol] = {
+                'info': fees,
+                'symbol': symbol,
+                'maker': self.parse_number(Precise.string_div(makerString, '100')),
+                'taker': self.parse_number(Precise.string_div(takerString, '100')),
+                'percentage': True,
+                'tierBased': True,
+            }
         return result
 
-    async def fetch_ohlcv(self, symbol, timeframe='1h', since=None, limit=None, params={}):
-        await self.load_markets()
+    async def fetch_ohlcv(self, symbol: str, timeframe: str = '1m', since: Int = None, limit: Int = None, params: dict = {}) -> list[list]:
+        """
+        hollaex has large gaps between candles, so it's recommended to specify since
+
+        https://apidocs.hollaex.com/#chart
+
+        :param str symbol: unified symbol of the market to fetch OHLCV data for
+        :param str timeframe: the length of time each candle represents
+        :param int [since]: timestamp in ms of the earliest candle to fetch
+        :param int [limit]: the maximum amount of candles to fetch(max 500)
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param int [params.until]: timestamp in ms of the latest candle to fetch
+        :returns int[][]: A list of candles ordered as timestamp, open, high, low, close, volume
+        """
+        if self.markets is None:
+            await self.load_markets()
         market = self.market(symbol)
         request = {
             'symbol': market['id'],
-            'resolution': self.timeframes[timeframe],
+            'resolution': self.safe_string(self.timeframes, timeframe, timeframe),
         }
-        duration = self.parse_timeframe(timeframe)
+        paginate = False
+        maxLimit = 500
+        paginateOption, paramsPaginate = self.handle_option_bool_and_params(params, 'fetchOHLCV', 'paginate', paginate)
+        if paginateOption:
+            return await self.fetch_paginated_call_deterministic('fetchOHLCV', symbol, since, limit, timeframe, paramsPaginate, maxLimit)
+        now = self.milliseconds()
+        # the exchange has not a lot of trades, so if we count until by limit and limit is small, it may return empty result
+        until = self.safe_integer(paramsPaginate, 'until', now)
+        timeDelta = self.parse_timeframe(timeframe) * maxLimit * 1000
         if since is None:
-            if limit is None:
-                raise ArgumentsRequired(self.id + " fetchOHLCV requires a 'since' or a 'limit' argument")
-            else:
-                end = self.seconds()
-                start = end - duration * limit
-                request['to'] = end
-                request['from'] = start
+            request['from'] = self.parse_to_int((until - timeDelta) / 1000)  # convert to seconds
         else:
-            if limit is None:
-                request['from'] = int(since / 1000)
-                request['to'] = self.seconds()
-            else:
-                start = int(since / 1000)
-                request['from'] = start
-                request['to'] = self.sum(start, duration * limit)
-        response = await self.publicGetChart(self.extend(request, params))
+            request['from'] = self.parse_to_int(since / 1000)  # convert to seconds
+        request['to'] = self.parse_to_int(until / 1000)  # convert to seconds
+        paramsOmitted = self.omit(paramsPaginate, 'until')
+        response = await self.publicGetChart(self.extend(request, paramsOmitted))
         #
         #     [
         #         {
@@ -574,9 +953,9 @@ class hollaex(Exchange):
         #         },
         #     ]
         #
-        return self.parse_ohlcvs(response, market, timeframe, since, limit)
+        return self.parse_ohlcvs(self.to_array(response), market, timeframe, since, limit)
 
-    def parse_ohlcv(self, response, market=None, timeframe='1h', since=None, limit=None):
+    def parse_ohlcv(self, ohlcv: object, market: Market = None) -> list:
         #
         #     {
         #         "time":"2020-03-02T20:00:00.000Z",
@@ -589,16 +968,46 @@ class hollaex(Exchange):
         #     }
         #
         return [
-            self.parse8601(self.safe_string(response, 'time')),
-            self.safe_float(response, 'open'),
-            self.safe_float(response, 'high'),
-            self.safe_float(response, 'low'),
-            self.safe_float(response, 'close'),
-            self.safe_float(response, 'volume'),
+            self.parse8601(self.safe_string(ohlcv, 'time')),
+            self.safe_number(ohlcv, 'open'),
+            self.safe_number(ohlcv, 'high'),
+            self.safe_number(ohlcv, 'low'),
+            self.safe_number(ohlcv, 'close'),
+            self.safe_number(ohlcv, 'volume'),
         ]
 
-    async def fetch_balance(self, params={}):
-        await self.load_markets()
+    def parse_balance(self, response: dict) -> Balances:
+        timestamp = self.parse8601(self.safe_string(response, 'updated_at'))
+        result = {
+            'info': response,
+            'timestamp': timestamp,
+            'datetime': self.iso8601(timestamp),
+        }
+        if self.currencies_by_id is None:
+            raise ExchangeError(self.id + ' currencies not loaded')
+        currenciesById = self.currencies_by_id
+        currencyIds = list(currenciesById.keys())
+        for i in range(0, len(currencyIds)):
+            currencyId = self.safe_string(currencyIds, i, '')
+            code = self.safe_currency_code(currencyId)
+            account = self.account()
+            account['free'] = self.safe_string(response, currencyId + '_available')
+            account['total'] = self.safe_string(response, currencyId + '_balance')
+            if code is not None:
+                result[code] = account
+        return self.safe_balance(result)
+
+    async def fetch_balance(self, params: dict = {}) -> Balances:
+        """
+        query for balance and get the amount of funds available for trading or funds locked in orders
+
+        https://apidocs.hollaex.com/#get-balance
+
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a `balance structure <https://docs.ccxt.com/?id=balance-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         response = await self.privateGetUserBalance(params)
         #
         #     {
@@ -609,114 +1018,249 @@ class hollaex(Exchange):
         #         "eth_balance": 0,
         #         "eth_pending": 0,
         #         "eth_available": 0,
-        #         # ...
+        #         // ...
         #     }
         #
-        result = {'info': response}
-        currencyIds = list(self.currencies_by_id.keys())
-        for i in range(0, len(currencyIds)):
-            currencyId = currencyIds[i]
-            code = self.safe_currency_code(currencyId)
-            account = self.account()
-            account['free'] = self.safe_float(response, currencyId + '_available')
-            account['total'] = self.safe_float(response, currencyId + '_balance')
-            result[code] = account
-        return self.parse_balance(result)
+        return self.parse_balance(response)
 
-    async def fetch_open_order(self, id, symbol=None, params={}):
-        await self.load_markets()
+    async def fetch_open_order(self, id: str, symbol: Str = None, params: dict = {}) -> Order:
+        """
+        fetch an open order by it's id
+
+        https://apidocs.hollaex.com/#get-order
+
+        :param str id: order id
+        :param str symbol: not used by fetchOpenOrder()
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         request = {
             'order_id': id,
         }
-        response = await self.privateGetUserOrdersOrderId(self.extend(request, params))
+        response = await self.privateGetOrder(self.extend(request, params))
         #
         #     {
-        #         "created_at": "2018-03-23T04:14:08.663Z",
-        #         "title": "string",
-        #         "side": "sell",
-        #         "type": "limit",
-        #         "price": 0,
-        #         "size": 0,
-        #         "symbol": "xht-usdt",
         #         "id": "string",
-        #         "created_by": 1,
-        #         "filled": 0
+        #         "side": "sell",
+        #         "symbol": "xht-usdt",
+        #         "size": 0.1,
+        #         "filled": 0,
+        #         "stop": null,
+        #         "fee": 0,
+        #         "fee_coin": "usdt",
+        #         "type": "limit",
+        #         "price": 1.09,
+        #         "status": "new",
+        #         "created_by": 116,
+        #         "created_at": "2021-02-17T02:32:38.910Z",
+        #         "updated_at": "2021-02-17T02:32:38.910Z",
+        #         "User": {
+        #             "id": 116,
+        #             "email": "fight@club.com",
+        #             "username": "narrator",
+        #             "exchange_id": 176
+        #         }
         #     }
         #
         return self.parse_order(response)
 
-    async def fetch_open_orders(self, symbol=None, since=None, limit=None, params={}):
-        await self.load_markets()
+    async def fetch_open_orders(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Order]:
+        """
+        fetch all unfilled currently open orders
+
+        https://apidocs.hollaex.com/#get-all-orders
+
+        :param str symbol: unified market symbol
+        :param int [since]: the earliest time in ms to fetch open orders for
+        :param int [limit]: the maximum number of  open orders structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
+        """
+        request = {
+            'open': True,
+        }
+        return await self.fetch_orders(symbol, since, limit, self.extend(request, params))
+
+    async def fetch_closed_orders(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Order]:
+        """
+        fetches information on multiple closed orders made by the user
+
+        https://apidocs.hollaex.com/#get-all-orders
+
+        :param str symbol: unified market symbol of the market orders were made in
+        :param int [since]: the earliest time in ms to fetch orders for
+        :param int [limit]: the maximum number of order structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
+        """
+        request = {
+            'open': False,
+        }
+        return await self.fetch_orders(symbol, since, limit, self.extend(request, params))
+
+    async def fetch_order(self, id: str, symbol: Str = None, params: dict = {}) -> Order:
+        """
+        fetches information on an order made by the user
+
+        https://apidocs.hollaex.com/#get-order
+
+        :param str id:
+        :param str symbol: unified symbol of the market the order was made in
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: An `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
+        request = {
+            'order_id': id,
+        }
+        response = await self.privateGetOrder(self.extend(request, params))
+        #             {
+        #                 "id": "string",
+        #                 "side": "sell",
+        #                 "symbol": "xht-usdt",
+        #                 "size": 0.1,
+        #                 "filled": 0,
+        #                 "stop": null,
+        #                 "fee": 0,
+        #                 "fee_coin": "usdt",
+        #                 "type": "limit",
+        #                 "price": 1.09,
+        #                 "status": "new",
+        #                 "created_by": 116,
+        #                 "created_at": "2021-02-17T02:32:38.910Z",
+        #                 "updated_at": "2021-02-17T02:32:38.910Z",
+        #                 "User": {
+        #                     "id": 116,
+        #                     "email": "fight@club.com",
+        #                     "username": "narrator",
+        #                     "exchange_id": 176
+        #                 }
+        #             }
+        if response is None:
+            raise OrderNotFound(self.id + ' fetchOrder() could not find order id ' + id)
+        return self.parse_order(response)
+
+    async def fetch_orders(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Order]:
+        """
+        fetches information on multiple orders made by the user
+
+        https://apidocs.hollaex.com/#get-all-orders
+
+        :param str symbol: unified market symbol of the market orders were made in
+        :param int [since]: the earliest time in ms to fetch orders for
+        :param int [limit]: the maximum number of order structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         market = None
-        request = {}
+        request = {
+            # 'symbol': market['id'],
+            # 'side': 'buy', // 'sell'
+            # 'status': 'new', // 'filled', 'pfilled', 'canceled'
+            # 'open': true,
+            # 'limit': limit, // default 50, max 100
+            # 'page': 1,
+            # 'order_by': 'created_at', // id, ...
+            # 'order': 'asc', // 'desc'
+            # 'start_date': this.iso8601 (since),
+            # 'end_date': this.iso8601 (this.milliseconds ()),
+        }
         if symbol is not None:
             market = self.market(symbol)
             request['symbol'] = market['id']
-        response = await self.privateGetUserOrders(self.extend(request, params))
-        #
-        #     [
-        #         {
-        #             "created_at":"2020-03-03T08:02:18.639Z",
-        #             "title":"5419ff3f-9d25-4af7-bcc2-803926518d76",
-        #             "side":"buy",
-        #             "type":"limit",
-        #             "price":226.19,
-        #             "size":0.086,
-        #             "symbol":"eth-usdt",
-        #             "id":"5419ff3f-9d25-4af7-bcc2-803926518d76",
-        #             "created_by":620,
-        #             "filled":0
-        #         }
-        #     ]
-        #
-        return self.parse_orders(response, market)
-
-    def parse_order(self, order, market=None):
-        #
-        # fetchOpenOrder, fetchOpenOrders
+        if since is not None:
+            request['start_date'] = self.iso8601(since)
+        if limit is not None:
+            request['limit'] = limit  # default 50, max 100
+        response = await self.privateGetOrders(self.extend(request, params))
         #
         #     {
-        #         "created_at":"2020-03-03T08:02:18.639Z",
-        #         "title":"5419ff3f-9d25-4af7-bcc2-803926518d76",
-        #         "side":"buy",
-        #         "type":"limit",
-        #         "price":226.19,
-        #         "size":0.086,
-        #         "symbol":"eth-usdt",
-        #         "id":"5419ff3f-9d25-4af7-bcc2-803926518d76",
-        #         "created_by":620,
-        #         "filled":0
+        #         "count": 1,
+        #         "data": [
+        #             {
+        #                 "id": "string",
+        #                 "side": "sell",
+        #                 "symbol": "xht-usdt",
+        #                 "size": 0.1,
+        #                 "filled": 0,
+        #                 "stop": null,
+        #                 "fee": 0,
+        #                 "fee_coin": "usdt",
+        #                 "type": "limit",
+        #                 "price": 1.09,
+        #                 "status": "new",
+        #                 "created_by": 116,
+        #                 "created_at": "2021-02-17T02:32:38.910Z",
+        #                 "updated_at": "2021-02-17T02:32:38.910Z",
+        #                 "User": {
+        #                     "id": 116,
+        #                     "email": "fight@club.com",
+        #                     "username": "narrator",
+        #                     "exchange_id": 176
+        #                 }
+        #             }
+        #         ]
         #     }
         #
-        symbol = None
+        data = self.safe_list(response, 'data', [])
+        return self.parse_orders(data, market, since, limit)
+
+    def parse_order_status(self, status: Str) -> Str:
+        statuses = {
+            'new': 'open',
+            'pfilled': 'open',
+            'filled': 'closed',
+            'canceled': 'canceled',
+        }
+        return self.safe_string(statuses, status, status)
+
+    def parse_order(self, order: dict, market: Market = None) -> Order:
+        #
+        # createOrder, fetchOpenOrder, fetchOpenOrders
+        #
+        #     {
+        #          "id":"10644b7e-3c90-4ba9-bc3b-188f3a4e9cfd",
+        #          "created_by":140093,
+        #          "exchange_id":22,
+        #          "side":"buy",
+        #          "symbol":"doge-usdt",
+        #          "type":"limit",
+        #          "price":0.05,
+        #          "size":10,
+        #          "stop":null,
+        #          "filled":0,
+        #          "status":"canceled",
+        #          "fee":0,
+        #          "fee_coin":"doge",
+        #          "meta": {                 // optional field only returned for postOnly orders
+        #              "post_only":true
+        #          },
+        #          "fee_structure": {
+        #              "maker":0.1,
+        #              "taker":0.1
+        #          },
+        #          "created_at":"2022-05-31T08:14:14.747Z",
+        #          "updated_at":"2022-05-31T08:14:23.727Z"
+        #      }
+        #
         marketId = self.safe_string(order, 'symbol')
-        if marketId is not None:
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-                symbol = market['symbol']
-            else:
-                baseId, quoteId = marketId.split('-')
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
-        if (symbol is None) and (market is not None):
-            symbol = market['symbol']
+        symbol = self.safe_symbol(marketId, market, '-')
         id = self.safe_string(order, 'id')
         timestamp = self.parse8601(self.safe_string(order, 'created_at'))
         type = self.safe_string(order, 'type')
         side = self.safe_string(order, 'side')
-        price = self.safe_float(order, 'price')
-        amount = self.safe_float(order, 'size')
-        filled = self.safe_float(order, 'filled')
-        cost = None
-        remaining = None
-        if filled is not None:
-            if amount is not None:
-                remaining = amount - filled
-            if price is not None:
-                cost = filled * price
-        status = 'closed' if (type == 'market') else 'open'
-        result = {
+        price = self.safe_string(order, 'price')
+        amount = self.safe_string(order, 'size')
+        filled = self.safe_string(order, 'filled')
+        status = self.parse_order_status(self.safe_string(order, 'status'))
+        meta = self.safe_dict(order, 'meta', {})
+        postOnly = self.safe_bool(meta, 'post_only', False)
+        return self.safe_order({
             'id': id,
             'clientOrderId': None,
             'timestamp': timestamp,
@@ -725,52 +1269,103 @@ class hollaex(Exchange):
             'status': status,
             'symbol': symbol,
             'type': type,
+            'timeInForce': None,
+            'postOnly': postOnly,
             'side': side,
             'price': price,
+            'triggerPrice': self.safe_string(order, 'stop'),
             'amount': amount,
             'filled': filled,
-            'remaining': remaining,
-            'cost': cost,
+            'remaining': None,
+            'cost': None,
             'trades': None,
             'fee': None,
             'info': order,
             'average': None,
-        }
-        return result
+        }, market)
 
-    async def create_order(self, symbol, type, side, amount, price=None, params={}):
-        await self.load_markets()
+    async def create_order(self, symbol: str, type: OrderType, side: OrderSide, amount: float, price: Num = None, params: dict = {}) -> Order:
+        """
+        create a trade order
+
+        https://apidocs.hollaex.com/#create-order
+
+        :param str symbol: unified symbol of the market to create an order in
+        :param str type: 'market' or 'limit'
+        :param str side: 'buy' or 'sell'
+        :param float amount: how much of currency you want to trade in units of base currency
+        :param float [price]: the price at which the order is to be fulfilled, in units of the quote currency, ignored in market orders
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param float [params.triggerPrice]: the price at which a trigger order is triggered at
+        :param bool [params.postOnly]: if True, the order will only be posted to the order book and not executed immediately
+        :returns dict: an `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         market = self.market(symbol)
-        order = {
+        request = {
             'symbol': market['id'],
             'side': side,
-            'size': amount,
+            'size': self.amount_to_precision(symbol, amount),
             'type': type,
+            # 'stop': parseFloat (this.priceToPrecision (symbol, stopPrice)),
+            # 'meta': {}, // other options such as post_only
         }
-        if type != 'market':
-            order['price'] = price
-        response = await self.privatePostOrder(self.extend(order, params))
+        triggerPrice = self.safe_number_n(params, ['triggerPrice', 'stopPrice', 'stop'])
+        meta = self.safe_dict(params, 'meta', {})
+        exchangeSpecificParam = self.safe_bool(meta, 'post_only', False)
+        isMarketOrder = type == 'market'
+        postOnly = self.is_post_only(isMarketOrder, exchangeSpecificParam, params)
+        if not isMarketOrder:
+            request['price'] = self.price_to_precision(symbol, price)
+        if triggerPrice is not None:
+            request['stop'] = self.price_to_precision(symbol, triggerPrice)
+        if postOnly:
+            request['meta'] = {'post_only': True}
+        paramsOmitted = self.omit(params, ['postOnly', 'timeInForce', 'stopPrice', 'triggerPrice', 'stop'])
+        response = await self.privatePostOrder(self.extend(request, paramsOmitted))
         #
         #     {
+        #         "fee": 0,
+        #         "meta": {},
         #         "symbol": "xht-usdt",
         #         "side": "sell",
-        #         "size": 1,
+        #         "size": 0.1,
         #         "type": "limit",
-        #         "price": 0.1,
+        #         "price": 1,
+        #         "fee_structure": {
+        #             "maker": 0.2,
+        #             "taker": 0.2
+        #         },
+        #         "fee_coin": "usdt",
         #         "id": "string",
-        #         "created_by": 34,
+        #         "created_by": 116,
         #         "filled": 0,
-        #         "status": "pending"
+        #         "status": "new",
+        #         "updated_at": "2021-02-17T03:03:19.231Z",
+        #         "created_at": "2021-02-17T03:03:19.231Z",
+        #         "stop": null
         #     }
         #
         return self.parse_order(response, market)
 
-    async def cancel_order(self, id, symbol=None, params={}):
-        await self.load_markets()
+    async def cancel_order(self, id: str, symbol: Str = None, params: dict = {}) -> Order:
+        """
+        cancels an open order
+
+        https://apidocs.hollaex.com/#cancel-order
+
+        :param str id: order id
+        :param str symbol: unified symbol of the market the order was made in
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: An `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         request = {
             'order_id': id,
         }
-        response = await self.privateDeleteUserOrdersOrderId(self.extend(request, params))
+        response = await self.privateDeleteOrder(self.extend(request, params))
         #
         #     {
         #         "title": "string",
@@ -786,14 +1381,25 @@ class hollaex(Exchange):
         #
         return self.parse_order(response)
 
-    async def cancel_all_orders(self, symbol=None, params={}):
-        await self.load_markets()
+    async def cancel_all_orders(self, symbol: Str = None, params: dict = {}) -> list[Order]:
+        """
+        cancel all open orders in a market
+
+        https://apidocs.hollaex.com/#cancel-all-orders
+
+        :param str symbol: unified market symbol of the market to cancel orders in
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if symbol is None:
+            raise ArgumentsRequired(self.id + ' cancelAllOrders() requires a symbol argument')
+        if self.markets is None:
+            await self.load_markets()
         request = {}
         market = None
-        if symbol is not None:
-            market = self.markets(symbol)
-            request['symbol'] = market['id']
-        response = await self.privateDeleteUserOrders(self.extend(request, params))
+        market = self.market(symbol)
+        request['symbol'] = market['id']
+        response = await self.privateDeleteOrderAll(self.extend(request, params))
         #
         #     [
         #         {
@@ -811,16 +1417,28 @@ class hollaex(Exchange):
         #
         return self.parse_orders(response, market)
 
-    async def fetch_my_trades(self, symbol=None, since=None, limit=None, params={}):
-        await self.load_markets()
+    async def fetch_my_trades(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Trade]:
+        """
+        fetch all trades made by the user
+
+        https://apidocs.hollaex.com/#get-trades
+
+        :param str symbol: unified market symbol
+        :param int [since]: the earliest time in ms to fetch trades for
+        :param int [limit]: the maximum number of trades structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Trade[]: a list of `trade structures <https://docs.ccxt.com/?id=trade-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         request = {
             # 'symbol': market['id'],
-            # 'limit': 50,  # default 50, max 100
-            # 'page': 1,  # page of data to retrieve
-            # 'order_by': 'timestamp',  # field to order data
-            # 'order': 'asc',  # asc or desc
-            # 'start_date': 123,  # starting date of queried data
-            # 'end_date': 321,  # ending date of queried data
+            # 'limit': 50, // default 50, max 100
+            # 'page': 1, // page of data to retrieve
+            # 'order_by': 'timestamp', // field to order data
+            # 'order': 'asc', // asc or desc
+            # 'start_date': 123, // starting date of queried data
+            # 'end_date': 321, // ending date of queried data
         }
         market = None
         if symbol is not None:
@@ -846,98 +1464,128 @@ class hollaex(Exchange):
         #         ]
         #     }
         #
-        data = self.safe_value(response, 'data', [])
+        data = self.safe_list(response, 'data', [])
         return self.parse_trades(data, market, since, limit)
 
-    async def fetch_deposit_address(self, code, params={}):
-        await self.load_markets()
-        currency = self.currency(code)
-        response = await self.privateGetUser(params)
+    def parse_deposit_address(self, depositAddress: dict, currency: Currency = None) -> DepositAddress:
         #
         #     {
-        #         "id": 620,
-        #         "email": "email@gmail.com",
-        #         "full_name": "",
-        #         "name_verified": False,
-        #         "gender": False,
-        #         "nationality": "",
-        #         "phone_number": "",
-        #         "address": {"city": "", "address": "", "country": "", "postal_code": ""},
-        #         "id_data": {"note": "", "type": "", "number": "", "status": 0},
-        #         "bank_account":[],
-        #         "crypto_wallet":{
-        #             "xrp": "rJtoECs6rPkJoAfgtR8SDDshV6hRHe3X7y:391496555"
-        #             "usdt":"0x1fb4248e167901dfa0d8cdda2243a2126d7ce48d"
-        #             # ...
-        #         },
-        #         "verification_level": 1,
-        #         "otp_enabled": True,
-        #         "activated": True,
-        #         "note": "",
-        #         "username": "user",
-        #         "affiliation_code": "QSWA6G",
-        #         "settings": {
-        #             "chat": {"set_username": False},
-        #             "risk": {"order_portfolio_percentage": 20},
-        #             "audio": {
-        #                 "public_trade": False,
-        #                 "order_completed": True,
-        #                 "order_partially_completed": True
-        #             },
-        #             "language": "en",
-        #             "interface": {"theme": "white","order_book_levels": 10},
-        #             "notification": {
-        #                 "popup_order_completed": True,
-        #                 "popup_order_confirmation": True,
-        #                 "popup_order_partially_filled": True
-        #             }
-        #         },
-        #         "flagged": False,
-        #         "is_hap": False,
-        #         "pin": False,
-        #         "discount": 0,
-        #         "created_at": "2020-03-02T22:27:38.331Z",
-        #         "updated_at": "2020-03-03T07:54:58.315Z",
-        #         "balance": {
-        #             "xht_balance": 0,
-        #             "xht_pending": 0,
-        #             "xht_available": 0,
-        #             # ...
-        #             "updated_at": "2020-03-03T10:21:05.430Z"
-        #         },
-        #         "images": [],
-        #         "fees": {
-        #             "btc-usdt": {"maker_fee": 0.1, "taker_fee": 0.3},
-        #             "eth-usdt": {"maker_fee": 0.1, "taker_fee": 0.3},
-        #             # ...
-        #         }
+        #         "currency":"usdt",
+        #         "address":"TECLD9XBH31XpyykdHU3uEAeUK7E6Lrmik",
+        #         "network":"trx",
+        #         "standard":null,
+        #         "is_valid":true,
+        #         "created_at":"2021-05-12T02:43:05.446Z"
         #     }
         #
-        cryptoWallet = self.safe_value(response, 'crypto_wallet')
-        address = self.safe_string(cryptoWallet, currency['id'])
+        address = self.safe_string(depositAddress, 'address')
         tag = None
         if address is not None:
             parts = address.split(':')
             address = self.safe_string(parts, 0)
             tag = self.safe_string(parts, 1)
         self.check_address(address)
+        currencyId = self.safe_string(depositAddress, 'currency')
+        currencyResolved = self.safe_currency(currencyId, currency)
+        networkId = self.safe_string(depositAddress, 'network')
         return {
-            'currency': code,
+            'info': depositAddress,
+            'currency': currencyResolved['code'],
+            'network': self.network_id_to_code(networkId, currencyResolved['code']),
             'address': address,
             'tag': tag,
-            'info': response,
         }
 
-    async def fetch_deposits(self, code=None, since=None, limit=None, params={}):
-        await self.load_markets()
+    async def fetch_deposit_addresses(self, codes: Strings = None, params: dict = {}) -> list[DepositAddress]:
+        """
+        fetch deposit addresses for multiple currencies and chain types
+
+        https://apidocs.hollaex.com/#get-user
+
+        :param str[]|None codes: list of unified currency codes, default is None
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a list of `address structures <https://docs.ccxt.com/?id=address-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
+        network = self.safe_string(params, 'network')
+        paramsOmitted = self.omit(params, 'network')
+        response = await self.privateGetUser(paramsOmitted)
+        #
+        #     {
+        #         "id":620,
+        #         "email":"igor.kroitor@gmail.com",
+        #         "full_name":"",
+        #         "gender":false,
+        #         "nationality":"",
+        #         "dob":null,
+        #         "phone_number":"",
+        #         "address":{"city":"","address":"","country":"","postal_code":""},
+        #         "id_data":{"note":"","type":"","number":"","status":0,"issued_date":"","expiration_date":""},
+        #         "bank_account":[],
+        #         "crypto_wallet":{},
+        #         "verification_level":1,
+        #         "email_verified":true,
+        #         "otp_enabled":true,
+        #         "activated":true,
+        #         "username":"igor.kroitor",
+        #         "affiliation_code":"QSWA6G",
+        #         "settings":{
+        #             "chat":{"set_username":false},
+        #             "risk":{"popup_warning":false,"order_portfolio_percentage":20},
+        #             "audio":{"public_trade":false,"order_completed":true,"order_partially_completed":true},
+        #             "language":"en",
+        #             "interface":{"theme":"white","order_book_levels":10},
+        #             "notification":{"popup_order_completed":true,"popup_order_confirmation":true,"popup_order_partially_filled":true}
+        #         },
+        #         "affiliation_rate":0,
+        #         "network_id":10620,
+        #         "discount":0,
+        #         "created_at":"2021-03-24T02:37:57.379Z",
+        #         "updated_at":"2021-03-24T02:37:57.379Z",
+        #         "balance":{
+        #             "btc_balance":0,
+        #             "btc_available":0,
+        #             "eth_balance":0.000914,
+        #             "eth_available":0.000914,
+        #             "updated_at":"2020-03-04T04:03:27.174Z
+        #         "},
+        #         "wallet":[
+        #             {"currency":"usdt","address":"TECLD9XBH31XpyykdHU3uEAeUK7E6Lrmik","network":"trx","standard":null,"is_valid":true,"created_at":"2021-05-12T02:43:05.446Z"},
+        #             {"currency":"xrp","address":"rGcSzmuRx8qngPRnrvpCKkP9V4njeCPGCv:286741597","network":"xrp","standard":null,"is_valid":true,"created_at":"2021-05-12T02:49:01.273Z"}
+        #         ]
+        #     }
+        #
+        wallet = self.safe_list(response, 'wallet', [])
+        addresses = None
+        if network is None:
+            addresses = wallet
+        else:
+            addresses = self.filter_by(wallet, 'network', self.network_code_to_id(network))
+        return self.parse_deposit_addresses(addresses, codes, False)
+
+    async def fetch_deposits(self, code: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Transaction]:
+        """
+        fetch all deposits made to an account
+
+        https://apidocs.hollaex.com/#get-deposits
+
+        :param str code: unified currency code
+        :param int [since]: the earliest time in ms to fetch deposits for
+        :param int [limit]: the maximum number of deposits structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict[]: a list of `transaction structures <https://docs.ccxt.com/?id=transaction-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         request = {
             # 'currency': currency['id'],
-            # 'limit': 50,  # default 50, max 100
-            # 'page': 1,  # page of data to retrieve
-            # 'order_by': 'timestamp',  # field to order data
-            # 'order': 'asc',  # asc or desc
-            # 'start_date': 123,  # starting date of queried data
-            # 'end_date': 321,  # ending date of queried data
+            # 'limit': 50, // default 50, max 100
+            # 'page': 1, // page of data to retrieve
+            # 'order_by': 'timestamp', // field to order data
+            # 'order': 'asc', // asc or desc
+            # 'start_date': 123, // starting date of queried data
+            # 'end_date': 321, // ending date of queried data
         }
         currency = None
         if code is not None:
@@ -958,9 +1606,9 @@ class hollaex(Exchange):
         #                 "fee": 0,
         #                 "address": "0x5c0cc98270d7089408fcbcc8e2131287f5be2306",
         #                 "transaction_id": "0xd4006327a5ec2c41adbdcf566eaaba6597c3d45906abe78ea1a4a022647c2e28",
-        #                 "status": True,
-        #                 "dismissed": False,
-        #                 "rejected": False,
+        #                 "status": true,
+        #                 "dismissed": false,
+        #                 "rejected": false,
         #                 "description": "",
         #                 "type": "deposit",
         #                 "currency": "usdt",
@@ -971,19 +1619,79 @@ class hollaex(Exchange):
         #         ]
         #     }
         #
-        data = self.safe_value(response, 'data', [])
+        data = self.safe_list(response, 'data', [])
         return self.parse_transactions(data, currency, since, limit)
 
-    async def fetch_withdrawals(self, code=None, since=None, limit=None, params={}):
-        await self.load_markets()
+    async def fetch_withdrawal(self, id: str, code: Str = None, params: dict = {}) -> Transaction:
+        """
+        fetch data on a currency withdrawal via the withdrawal id
+
+        https://apidocs.hollaex.com/#get-withdrawals
+
+        :param str id: withdrawal id
+        :param str code: unified currency code of the currency withdrawn, default is None
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a `transaction structure <https://docs.ccxt.com/?id=transaction-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
+        request = {
+            'transaction_id': id,
+        }
+        currency = None
+        if code is not None:
+            currency = self.currency(code)
+            request['currency'] = currency['id']
+        response = await self.privateGetUserWithdrawals(self.extend(request, params))
+        #
+        #     {
+        #         "count": 1,
+        #         "data": [
+        #             {
+        #                 "id": 539,
+        #                 "amount": 20,
+        #                 "fee": 0,
+        #                 "address": "0x5c0cc98270d7089408fcbcc8e2131287f5be2306",
+        #                 "transaction_id": "0xd4006327a5ec2c41adbdcf566eaaba6597c3d45906abe78ea1a4a022647c2e28",
+        #                 "status": true,
+        #                 "dismissed": false,
+        #                 "rejected": false,
+        #                 "description": "",
+        #                 "type": "withdrawal",
+        #                 "currency": "usdt",
+        #                 "created_at": "2020-03-03T07:56:36.198Z",
+        #                 "updated_at": "2020-03-03T08:00:05.674Z",
+        #                 "user_id": 620
+        #             }
+        #         ]
+        #     }
+        #
+        data = self.safe_list(response, 'data', [])
+        transaction = self.safe_dict(data, 0, {})
+        return self.parse_transaction(transaction, currency)
+
+    async def fetch_withdrawals(self, code: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Transaction]:
+        """
+        fetch all withdrawals made from an account
+
+        https://apidocs.hollaex.com/#get-withdrawals
+
+        :param str code: unified currency code
+        :param int [since]: the earliest time in ms to fetch withdrawals for
+        :param int [limit]: the maximum number of withdrawals structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict[]: a list of `transaction structures <https://docs.ccxt.com/?id=transaction-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         request = {
             # 'currency': currency['id'],
-            # 'limit': 50,  # default 50, max 100
-            # 'page': 1,  # page of data to retrieve
-            # 'order_by': 'timestamp',  # field to order data
-            # 'order': 'asc',  # asc or desc
-            # 'start_date': 123,  # starting date of queried data
-            # 'end_date': 321,  # ending date of queried data
+            # 'limit': 50, // default 50, max 100
+            # 'page': 1, // page of data to retrieve
+            # 'order_by': 'timestamp', // field to order data
+            # 'order': 'asc', // asc or desc
+            # 'start_date': 123, // starting date of queried data
+            # 'end_date': 321, // ending date of queried data
         }
         currency = None
         if code is not None:
@@ -1004,9 +1712,9 @@ class hollaex(Exchange):
         #                 "fee": 0,
         #                 "address": "0x5c0cc98270d7089408fcbcc8e2131287f5be2306",
         #                 "transaction_id": "0xd4006327a5ec2c41adbdcf566eaaba6597c3d45906abe78ea1a4a022647c2e28",
-        #                 "status": True,
-        #                 "dismissed": False,
-        #                 "rejected": False,
+        #                 "status": true,
+        #                 "dismissed": false,
+        #                 "rejected": false,
         #                 "description": "",
         #                 "type": "withdrawal",
         #                 "currency": "usdt",
@@ -1017,10 +1725,12 @@ class hollaex(Exchange):
         #         ]
         #     }
         #
-        data = self.safe_value(response, 'data', [])
+        data = self.safe_list(response, 'data', [])
         return self.parse_transactions(data, currency, since, limit)
 
-    def parse_transaction(self, transaction, currency=None):
+    def parse_transaction(self, transaction: dict, currency: Currency = None) -> Transaction:
+        #
+        # fetchWithdrawals, fetchDeposits
         #
         #     {
         #         "id": 539,
@@ -1028,9 +1738,9 @@ class hollaex(Exchange):
         #         "fee": 0,
         #         "address": "0x5c0cc98270d7089408fcbcc8e2131287f5be2306",
         #         "transaction_id": "0xd4006327a5ec2c41adbdcf566eaaba6597c3d45906abe78ea1a4a022647c2e28",
-        #         "status": True,
-        #         "dismissed": False,
-        #         "rejected": False,
+        #         "status": true,
+        #         "dismissed": false,
+        #         "rejected": false,
         #         "description": "",
         #         "type": "withdrawal",
         #         "currency": "usdt",
@@ -1039,12 +1749,23 @@ class hollaex(Exchange):
         #         "user_id": 620
         #     }
         #
+        # withdraw
+        #
+        #     {
+        #         "message": "Withdrawal request is in the queue and will be processed.",
+        #         "transaction_id": "1d1683c3-576a-4d53-8ff5-27c93fd9758a",
+        #         "amount": 1,
+        #         "currency": "xht",
+        #         "fee": 0,
+        #         "fee_coin": "xht"
+        #     }
+        #
         id = self.safe_string(transaction, 'id')
         txid = self.safe_string(transaction, 'transaction_id')
         timestamp = self.parse8601(self.safe_string(transaction, 'created_at'))
         updated = self.parse8601(self.safe_string(transaction, 'updated_at'))
         type = self.safe_string(transaction, 'type')
-        amount = self.safe_float(transaction, 'amount')
+        amount = self.safe_number(transaction, 'amount')
         address = self.safe_string(transaction, 'address')
         addressTo = None
         addressFrom = None
@@ -1058,11 +1779,12 @@ class hollaex(Exchange):
             addressTo = address
             tagTo = tag
         currencyId = self.safe_string(transaction, 'currency')
-        code = self.safe_currency_code(currencyId)
-        status = self.safe_value(transaction, 'status')
-        dismissed = self.safe_value(transaction, 'dismissed')
-        rejected = self.safe_value(transaction, 'rejected')
-        if status:
+        currencyResolved = self.safe_currency(currencyId, currency)
+        completed = self.safe_bool(transaction, 'status', False)
+        dismissed = self.safe_bool(transaction, 'dismissed', False)
+        rejected = self.safe_bool(transaction, 'rejected', False)
+        status = None
+        if completed:
             status = 'ok'
         elif dismissed:
             status = 'canceled'
@@ -1070,16 +1792,22 @@ class hollaex(Exchange):
             status = 'failed'
         else:
             status = 'pending'
-        fee = {
-            'currency': code,
-            'cost': self.safe_float(transaction, 'fee'),
-        }
+        feeCurrencyId = self.safe_string(transaction, 'fee_coin')
+        feeCurrencyCode = self.safe_currency_code(feeCurrencyId, currencyResolved)
+        feeCost = self.safe_number(transaction, 'fee')
+        fee = None
+        if feeCost is not None:
+            fee = {
+                'currency': feeCurrencyCode,
+                'cost': feeCost,
+            }
         return {
             'info': transaction,
             'id': id,
             'txid': txid,
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
+            'network': None,
             'addressFrom': addressFrom,
             'address': address,
             'addressTo': addressTo,
@@ -1088,70 +1816,225 @@ class hollaex(Exchange):
             'tagTo': tagTo,
             'type': type,
             'amount': amount,
-            'currency': code,
+            'currency': currencyResolved['code'],
             'status': status,
             'updated': updated,
+            'comment': self.safe_string(transaction, 'message'),
+            'internal': None,
             'fee': fee,
         }
 
-    async def withdraw(self, code, amount, address, tag=None, params={}):
-        self.check_address(address)
-        await self.load_markets()
+    async def withdraw(self, code: str, amount: float, address: str, params: dict = {}) -> Transaction:
+        """
+        make a withdrawal
+
+        https://apidocs.hollaex.com/#withdrawal
+
+        :param str code: unified currency code
+        :param float amount: the amount to withdraw
+        :param str address: the address to withdraw to
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param str [params.tag]: memo / destination tag, required for currencies in options['withdrawTagRequiredCurrencies']
+        :returns dict: a `transaction structure <https://docs.ccxt.com/?id=transaction-structure>`
+        """
+        tagWithdrawTag, paramsWithdrawTag = self.handle_param_string(params, 'tag')
+        self.check_address(address, code, tagWithdrawTag)
+        if self.markets is None:
+            await self.load_markets()
         currency = self.currency(code)
-        if tag is not None:
-            address += ':' + tag
+        addressWithTag = address
+        if tagWithdrawTag is not None:
+            addressWithTag = address + ':' + tagWithdrawTag
+        network = self.safe_string(paramsWithdrawTag, 'network')
+        if network is None:
+            raise ArgumentsRequired(self.id + ' withdraw() requires a network parameter')
         request = {
             'currency': currency['id'],
             'amount': amount,
-            'address': address,
+            'address': addressWithTag,
+            'network': self.network_code_to_id(network, code),
         }
-        # one time password
-        otp = self.safe_string(params, 'otp_code')
-        if (otp is not None) or (self.twofa is not None):
-            if otp is None:
-                otp = self.oath()
-            request['otp_code'] = otp
-        response = await self.privatePostUserRequestWithdrawal(self.extend(request, params))
-        return {
-            'info': response,
-            'id': None,
-        }
+        response = await self.privatePostUserWithdrawal(self.extend(request, self.omit(paramsWithdrawTag, 'network')))
+        #
+        #     {
+        #         "message": "Withdrawal request is in the queue and will be processed.",
+        #         "transaction_id": "1d1683c3-576a-4d53-8ff5-27c93fd9758a",
+        #         "amount": 1,
+        #         "currency": "xht",
+        #         "fee": 0,
+        #         "fee_coin": "xht"
+        #     }
+        #
+        return self.parse_transaction(response, currency)
 
-    def sign(self, path, api='public', method='GET', params={}, headers=None, body=None):
+    def parse_deposit_withdraw_fee(self, fee: dict, currency: Currency = None) -> object:
+        #
+        #    "bch":{
+        #        "id":4,
+        #        "fullname":"Bitcoin Cash",
+        #        "symbol":"bch",
+        #        "active":true,
+        #        "verified":true,
+        #        "allow_deposit":true,
+        #        "allow_withdrawal":true,
+        #        "withdrawal_fee":0.0001,
+        #        "min":0.001,
+        #        "max":100000,
+        #        "increment_unit":0.001,
+        #        "logo":"https://bitholla.s3.ap-northeast-2.amazonaws.com/icon/BCH-hollaex-asset-01.svg",
+        #        "code":"bch",
+        #        "is_public":true,
+        #        "meta":{},
+        #        "estimated_price":null,
+        #        "description":null,
+        #        "type":"blockchain",
+        #        "network":null,
+        #        "standard":null,
+        #        "issuer":"HollaEx",
+        #        "withdrawal_fees":null,
+        #        "created_at":"2019-08-09T10:45:43.367Z",
+        #        "updated_at":"2021-12-13T03:08:32.372Z",
+        #        "created_by":1,
+        #        "owner_id":1
+        #    }
+        #
+        result = {
+            'info': fee,
+            'withdraw': {
+                'fee': None,
+                'percentage': None,
+            },
+            'deposit': {
+                'fee': None,
+                'percentage': None,
+            },
+        }
+        networks = {}
+        allowWithdrawal = self.safe_bool(fee, 'allow_withdrawal', False)
+        if allowWithdrawal:
+            result['withdraw'] = {'fee': self.safe_number(fee, 'withdrawal_fee'), 'percentage': False}
+        withdrawalFees = self.safe_dict(fee, 'withdrawal_fees')
+        if withdrawalFees is not None:
+            keys = list(withdrawalFees.keys())
+            keysLength = len(keys)
+            for i in range(0, keysLength):
+                key = keys[i]
+                value = self.safe_dict(withdrawalFees, key)
+                currencyId = self.safe_string(value, 'symbol')
+                currencyCode = self.safe_currency_code(currencyId)
+                networkCode = self.network_id_to_code(key, currencyCode)
+                if networkCode is None:
+                    raise ArgumentsRequired(self.id + ' requires a networkCode argument')
+                networkCodeUpper = networkCode.upper()  # default to the upper case network code
+                withdrawalFee = self.safe_number(value, 'value')
+                networks[networkCodeUpper] = {
+                    'deposit': None,
+                    'withdraw': withdrawalFee,
+                }
+        result['networks'] = networks
+        return result
+
+    async def fetch_deposit_withdraw_fees(self, codes: Strings = None, params: dict = {}) -> DepositWithdrawFees:
+        """
+        fetch deposit and withdraw fees
+
+        https://apidocs.hollaex.com/#constants
+
+        :param str[]|None codes: list of unified currency codes
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a list of `fee structures <https://docs.ccxt.com/?id=fee-structure>`
+        """
+        response = await self.publicGetConstants(params)
+        #
+        #     {
+        #         "coins":{
+        #             "bch":{
+        #                 "id":4,
+        #                 "fullname":"Bitcoin Cash",
+        #                 "symbol":"bch",
+        #                 "active":true,
+        #                 "verified":true,
+        #                 "allow_deposit":true,
+        #                 "allow_withdrawal":true,
+        #                 "withdrawal_fee":0.0001,
+        #                 "min":0.001,
+        #                 "max":100000,
+        #                 "increment_unit":0.001,
+        #                 "logo":"https://bitholla.s3.ap-northeast-2.amazonaws.com/icon/BCH-hollaex-asset-01.svg",
+        #                 "code":"bch",
+        #                 "is_public":true,
+        #                 "meta":{},
+        #                 "estimated_price":null,
+        #                 "description":null,
+        #                 "type":"blockchain",
+        #                 "network":null,
+        #                 "standard":null,
+        #                 "issuer":"HollaEx",
+        #                 "withdrawal_fees":null,
+        #                 "created_at":"2019-08-09T10:45:43.367Z",
+        #                 "updated_at":"2021-12-13T03:08:32.372Z",
+        #                 "created_by":1,
+        #                 "owner_id":1
+        #             },
+        #         },
+        #         "network":"https://api.hollaex.network"
+        #     }
+        #
+        coins = self.safe_dict(response, 'coins', {})
+        return self.parse_deposit_withdraw_fees(coins, codes, 'symbol')
+
+    def sign(self, path: str, api: list[str] = ['public'], method: str = 'GET', params: dict = {}) -> dict:
         query = self.omit(params, self.extract_params(path))
-        path = '/' + self.version + '/' + self.implode_params(path, params)
-        if method == 'GET':
-            if query:
-                path += '?' + self.urlencode(query)
-        url = self.urls['api'] + path
-        if api == 'private':
+        requestPath = '/' + self.version + '/' + self.implode_params(path, params)
+        if (method == 'GET') or (method == 'DELETE'):
+            if len(query) > 0:
+                requestPath += '?' + self.urlencode(query)
+        apiUrl = self.safe_string(self.urls['api'], 'rest')
+        if apiUrl is None:
+            raise ExchangeError(self.id + ' sign() has no API URL for self endpoint')
+        url = apiUrl + requestPath
+        requestBody = None
+        requestHeaders = None
+        if api[0] == 'private':
             self.check_required_credentials()
-            defaultExpires = self.safe_integer_2(self.options, 'api-expires', 'expires', int(self.timeout / 1000))
+            timeoutMs = self.parse_to_int(self.timeout)
+            defaultExpires = self.safe_integer_2(self.options, 'api-expires', 'expires', self.parse_to_int(timeoutMs / 1000))
             expires = self.sum(self.seconds(), defaultExpires)
-            expiresString = str(expires)
-            auth = method + path + expiresString
-            headers = {
-                'api-key': self.encode(self.apiKey),
+            expiresString = self.number_to_string(expires)
+            auth = method + requestPath + expiresString
+            requestHeaders = {
+                'api-key': self.apiKey,
                 'api-expires': expiresString,
             }
             if method == 'POST':
-                headers['Content-type'] = 'application/json'
-                if query:
-                    body = self.json(query)
-                    auth += body
-            signature = self.hmac(self.encode(auth), self.encode(self.secret))
-            headers['api-signature'] = signature
-        return {'url': url, 'method': method, 'body': body, 'headers': headers}
+                requestHeaders['Content-type'] = 'application/json'
+                if len(query) > 0:
+                    requestBody = self.json(query)
+                    auth += requestBody
+            signature = self.hmac(self.encode(auth), self.encode(self.secret), hashlib.sha256)
+            requestHeaders['api-signature'] = signature
+        bodyResult = requestBody
+        headersResult = requestHeaders
+        return {'url': url, 'method': method, 'body': bodyResult, 'headers': headersResult}
 
-    def handle_errors(self, code, reason, url, method, headers, body, response, requestHeaders, requestBody):
+    def handle_errors(self, code: int, reason: str, url: str, method: str, headers: dict, body: str, response: object, requestHeaders: dict, requestBody: Str):
+        # { "message": "Invalid token" }
         if response is None:
-            return
-        if (code >= 400) and (code <= 503):
+            return None
+        statusCode = self.parse_to_int(code)
+        if (statusCode >= 400) and (statusCode <= 503):
             #
-            #  {"message": "Invalid token"}
+            #  { "message": "Invalid token" }
+            #
+            # different errors return the same code eg
+            #
+            #  { "message":"Error 1001 - Order rejected. Order could not be submitted as this order was set to a post only order." }
+            #
+            #  { "message":"Error 1001 - POST ONLY order can not be of type market" }
             #
             feedback = self.id + ' ' + body
             message = self.safe_string(response, 'message')
             self.throw_broadly_matched_exception(self.exceptions['broad'], message, feedback)
             status = str(code)
             self.throw_exactly_matched_exception(self.exceptions['exact'], status, feedback)
+        return None

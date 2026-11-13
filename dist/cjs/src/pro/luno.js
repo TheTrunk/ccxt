@@ -1,0 +1,459 @@
+'use strict';
+
+Object.defineProperty(exports, '__esModule', { value: true });
+
+var luno$1 = require('../luno.js');
+var Precise = require('../base/Precise.js');
+var errors = require('../base/errors.js');
+var Cache = require('../base/ws/Cache.js');
+
+// ----------------------------------------------------------------------------
+//  ---------------------------------------------------------------------------
+class luno extends luno$1["default"] {
+    describe() {
+        return this.deepExtend(super.describe(), {
+            'has': {
+                'ws': true,
+                'watchTicker': false,
+                'watchTickers': false,
+                'watchTrades': true,
+                'watchTradesForSymbols': false,
+                'watchMyTrades': false,
+                'watchOrders': undefined, // is in beta
+                'watchOrderBook': true,
+                'watchOHLCV': false,
+            },
+            'urls': {
+                'api': {
+                    'ws': 'wss://ws.luno.com/api/1',
+                },
+            },
+            'options': {
+                'sequenceNumbers': {},
+            },
+            'streaming': {},
+            'exceptions': {},
+        });
+    }
+    /**
+     * @method
+     * @name luno#watchTrades
+     * @description get the list of most recent trades for a particular symbol
+     * @see https://www.luno.com/en/developers/api#tag/Streaming-API
+     * @param {string} symbol unified symbol of the market to fetch trades for
+     * @param {int} [since] timestamp in ms of the earliest trade to fetch
+     * @param {int} [limit] the maximum amount of    trades to fetch
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=public-trades}
+     */
+    async watchTrades(symbol, since = undefined, limit = undefined, params = {}) {
+        this.checkRequiredCredentials();
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const market = this.market(symbol);
+        const symbolValue = market['symbol'];
+        const marketId = this.safeString(market, 'id', '');
+        const subscriptionHash = '/stream/' + marketId;
+        const subscription = { 'symbol': symbolValue };
+        const wsUrl = this.safeString(this.urls['api'], 'ws');
+        if (wsUrl === undefined) {
+            throw new errors.ExchangeError(this.id + ' watchTrades() has no websocket url');
+        }
+        const url = wsUrl + subscriptionHash;
+        const messageHash = 'trades:' + symbolValue;
+        const subscribe = {
+            'api_key_id': this.apiKey,
+            'api_key_secret': this.secret,
+        };
+        const request = this.deepExtend(subscribe, params);
+        const trades = await this.watch(url, messageHash, request, subscriptionHash, subscription);
+        let limitResolved = limit;
+        if (this.newUpdates) {
+            limitResolved = trades.getLimit(symbolValue, limit);
+        }
+        return this.filterBySinceLimit(trades, since, limitResolved, 'timestamp', true);
+    }
+    handleTrades(client, message, subscription) {
+        //
+        //     {
+        //         "sequence": "110980825",
+        //         "trade_updates": [],
+        //         "create_update": {
+        //             "order_id": "BXHSYXAUMH8C2RW",
+        //             "type": "ASK",
+        //             "price": "24081.09000000",
+        //             "volume": "0.07780000"
+        //         },
+        //         "delete_update": null,
+        //         "status_update": null,
+        //         "timestamp": 1660598775360
+        //     }
+        //
+        const rawTrades = this.safeList(message, 'trade_updates', []);
+        const length = rawTrades.length;
+        if (length === 0) {
+            return;
+        }
+        const symbol = subscription['symbol'];
+        const market = this.market(symbol);
+        const symbolValue = market['symbol'];
+        const messageHash = 'trades:' + symbolValue;
+        let stored = this.safeValue(this.trades, symbolValue);
+        if (stored === undefined) {
+            const limit = this.safeInteger(this.options, 'tradesLimit', 1000);
+            stored = new Cache.ArrayCache(limit);
+            this.trades[symbolValue] = stored;
+        }
+        for (let i = 0; i < rawTrades.length; i++) {
+            const rawTrade = rawTrades[i];
+            const trade = this.parseTrade(rawTrade, market);
+            stored.append(trade);
+        }
+        this.trades[symbolValue] = stored;
+        client.resolve(stored, messageHash);
+    }
+    parseTrade(trade, market = undefined) {
+        //
+        // watchTrades (public)
+        //
+        //     {
+        //       "base": "69.00000000",
+        //       "counter": "113.6499000000000000",
+        //       "maker_order_id": "BXEEU4S2BWF5WRB",
+        //       "taker_order_id": "BXKNCSF7JDHXY3H",
+        //       "order_id": "BXEEU4S2BWF5WRB"
+        //     }
+        //
+        let symbol = undefined;
+        if (market === undefined) {
+            symbol = undefined;
+        }
+        else {
+            symbol = market['symbol'];
+        }
+        return this.safeTrade({
+            'info': trade,
+            'id': undefined,
+            'timestamp': undefined,
+            'datetime': undefined,
+            'symbol': symbol,
+            'order': undefined,
+            'type': undefined,
+            'side': undefined,
+            // takerOrMaker has no meaning for public trades
+            'takerOrMaker': undefined,
+            'price': undefined,
+            'amount': this.safeString(trade, 'base'),
+            'cost': this.safeString(trade, 'counter'),
+            'fee': undefined,
+        }, market);
+    }
+    /**
+     * @method
+     * @name luno#watchOrderBook
+     * @description watches information on open orders with bid (buy) and ask (sell) prices, volumes and other data
+     * @see https://www.luno.com/en/developers/api#tag/Streaming-API
+     * @param {string} symbol unified symbol of the market to fetch the order book for
+     * @param {int} [limit] the maximum amount of order book entries to return
+     * @param {objectConstructor} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.type] accepts l2 or l3 for level 2 or level 3 order book
+     * @returns {object} an [order book structure]{@link https://docs.ccxt.com/?id=order-book-structure}
+     */
+    async watchOrderBook(symbol, limit = undefined, params = {}) {
+        this.checkRequiredCredentials();
+        if (this.markets === undefined) {
+            await this.loadMarkets();
+        }
+        const market = this.market(symbol);
+        const symbolValue = market['symbol'];
+        const marketId = this.safeString(market, 'id', '');
+        const subscriptionHash = '/stream/' + marketId;
+        const subscription = { 'symbol': symbolValue };
+        const wsUrl = this.safeString(this.urls['api'], 'ws');
+        if (wsUrl === undefined) {
+            throw new errors.ExchangeError(this.id + ' watchOrderBook() has no websocket url');
+        }
+        const url = wsUrl + subscriptionHash;
+        const messageHash = 'orderbook:' + symbolValue;
+        const subscribe = {
+            'api_key_id': this.apiKey,
+            'api_key_secret': this.secret,
+        };
+        const request = this.deepExtend(subscribe, params);
+        const orderbook = await this.watch(url, messageHash, request, subscriptionHash, subscription);
+        return orderbook.limit();
+    }
+    handleOrderBook(client, message, subscription) {
+        //
+        //     {
+        //         "sequence": "24352",
+        //         "asks": [{
+        //             "id": "BXMC2CJ7HNB88U4",
+        //             "price": "1234.00",
+        //             "volume": "0.93"
+        //         }],
+        //         "bids": [{
+        //             "id": "BXMC2CJ7HNB88U5",
+        //             "price": "1201.00",
+        //             "volume": "1.22"
+        //         }],
+        //         "status": "ACTIVE",
+        //         "timestamp": 1528884331021
+        //     }
+        //
+        //  update
+        //     {
+        //         "sequence": "110980825",
+        //         "trade_updates": [],
+        //         "create_update": {
+        //             "order_id": "BXHSYXAUMH8C2RW",
+        //             "type": "ASK",
+        //             "price": "24081.09000000",
+        //             "volume": "0.07780000"
+        //         },
+        //         "delete_update": null,
+        //         "status_update": null,
+        //         "timestamp": 1660598775360
+        //     }
+        //
+        const symbol = this.safeString(subscription, 'symbol', '');
+        const messageHash = 'orderbook:' + symbol;
+        const timestamp = this.safeInteger(message, 'timestamp');
+        if (!(symbol in this.orderbooks)) {
+            this.orderbooks[symbol] = this.indexedOrderBook({});
+        }
+        const orderbook = this.orderbooks[symbol];
+        const asks = this.safeList(message, 'asks');
+        if (asks === undefined) {
+            const inSequence = this.isOrderBookDeltaInSequence(client, message, symbol);
+            if (!inSequence) {
+                return;
+            }
+        }
+        if (asks !== undefined) {
+            const snapshot = this.customParseOrderBook(message, symbol, timestamp, 'bids', 'asks', 'price', 'volume', 'id');
+            orderbook.reset(snapshot);
+        }
+        else {
+            this.handleBookDelta(orderbook, message);
+            orderbook['timestamp'] = timestamp;
+            orderbook['datetime'] = this.iso8601(timestamp);
+        }
+        const nonce = this.safeInteger(message, 'sequence');
+        orderbook['nonce'] = nonce;
+        client.resolve(orderbook, messageHash);
+    }
+    customParseOrderBook(orderbook, symbol, timestamp = undefined, bidsKey = 'bids', asksKey = 'asks', priceKey = 'price', amountKey = 'volume', countOrIdKey = 2) {
+        const bids = this.parseOrderBookBidsAsks(this.safeList(orderbook, bidsKey, []), priceKey, amountKey, countOrIdKey);
+        const asks = this.parseOrderBookBidsAsks(this.safeList(orderbook, asksKey, []), priceKey, amountKey, countOrIdKey);
+        return {
+            'symbol': symbol,
+            'bids': this.sortBy(bids, 0, true),
+            'asks': this.sortBy(asks, 0),
+            'timestamp': timestamp,
+            'datetime': this.iso8601(timestamp),
+            'nonce': undefined,
+        };
+    }
+    parseOrderBookBidsAsks(bidasks, priceKey = 'price', amountKey = 'volume', thirdKey = 2) {
+        const bidasksValue = this.toArray(bidasks);
+        const result = [];
+        for (let i = 0; i < bidasksValue.length; i++) {
+            result.push(this.customParseBidAsk(bidasksValue[i], priceKey, amountKey, thirdKey));
+        }
+        return result;
+    }
+    customParseBidAsk(bidask, priceKey = 'price', amountKey = 'volume', thirdKey = 2) {
+        const price = this.safeNumber(bidask, priceKey);
+        const amount = this.safeNumber(bidask, amountKey);
+        const result = [price, amount];
+        if (thirdKey !== undefined) {
+            result.push(this.safeString(bidask, thirdKey));
+        }
+        return result;
+    }
+    handleBookDelta(orderbook, message) {
+        //
+        //  create
+        //     {
+        //         "sequence": "110980825",
+        //         "trade_updates": [],
+        //         "create_update": {
+        //             "order_id": "BXHSYXAUMH8C2RW",
+        //             "type": "ASK",
+        //             "price": "24081.09000000",
+        //             "volume": "0.07780000"
+        //         },
+        //         "delete_update": null,
+        //         "status_update": null,
+        //         "timestamp": 1660598775360
+        //     }
+        //  delete
+        //     {
+        //         "sequence": "110980825",
+        //         "trade_updates": [],
+        //         "create_update": null,
+        //         "delete_update": {
+        //             "order_id": "BXMC2CJ7HNB88U4"
+        //         },
+        //         "status_update": null,
+        //         "timestamp": 1660598775360
+        //     }
+        //  trade
+        //     {
+        //         "sequence": "110980825",
+        //         "trade_updates": [
+        //             {
+        //                 "base": "0.1",
+        //                 "counter": "5232.00",
+        //                 "maker_order_id": "BXMC2CJ7HNB88U4",
+        //                 "taker_order_id": "BXMC2CJ7HNB88U5"
+        //             }
+        //         ],
+        //         "create_update": null,
+        //         "delete_update": null,
+        //         "status_update": null,
+        //         "timestamp": 1660598775360
+        //     }
+        //
+        const asksOrderSide = orderbook['asks'];
+        const bidsOrderSide = orderbook['bids'];
+        // trade updates are applied first, matching the ordering of the
+        // reference luno streaming client
+        const tradeUpdates = this.safeList(message, 'trade_updates', []);
+        for (let i = 0; i < tradeUpdates.length; i++) {
+            const tradeUpdate = tradeUpdates[i];
+            const makerOrderId = this.safeString(tradeUpdate, 'maker_order_id');
+            const tradedAmount = this.safeString(tradeUpdate, 'base');
+            if ((makerOrderId !== undefined) && (tradedAmount !== undefined)) {
+                // the message does not carry the side of the maker order and
+                // order ids are unique across the book, so try the bids first
+                // and fall back to the asks only on a miss
+                const reduced = this.reduceOrderVolume(bidsOrderSide, makerOrderId, tradedAmount);
+                if (!reduced) {
+                    this.reduceOrderVolume(asksOrderSide, makerOrderId, tradedAmount);
+                }
+            }
+        }
+        const createUpdate = this.safeDict(message, 'create_update');
+        if (createUpdate !== undefined) {
+            const bidAskArray = this.customParseBidAsk(createUpdate, 'price', 'volume', 'order_id');
+            const type = this.safeString(createUpdate, 'type');
+            if (type === 'ASK') {
+                asksOrderSide.storeArray(bidAskArray);
+            }
+            else if (type === 'BID') {
+                bidsOrderSide.storeArray(bidAskArray);
+            }
+        }
+        const deleteUpdate = this.safeDict(message, 'delete_update');
+        if (deleteUpdate !== undefined) {
+            const orderId = this.safeString(deleteUpdate, 'order_id');
+            asksOrderSide.storeArray([0, 0, orderId]);
+            bidsOrderSide.storeArray([0, 0, orderId]);
+        }
+    }
+    /**
+     * @ignore
+     * @method
+     * @name luno#reduceOrderVolume
+     * @description reduces the outstanding volume of the order with the given id inside one side of a level-3 orderbook after a trade, deleting the order when it is fully filled
+     * @param {object} orderSide the bids or asks side of an indexed orderbook
+     * @param {string} orderId the exchange-specific id of the maker order that traded
+     * @param {string} tradedAmount the traded amount in base currency, as a string
+     * @returns {boolean} true if the order was found in this side, false otherwise
+     */
+    reduceOrderVolume(orderSide, orderId, tradedAmount) {
+        const sideLength = orderSide.length;
+        for (let i = 0; i < sideLength; i++) {
+            const order = orderSide[i];
+            const entryId = this.safeString(order, 2);
+            if (entryId === orderId) {
+                const price = this.safeNumber(order, 0);
+                const currentAmount = this.safeString(order, 1);
+                const remainingAmount = Precise["default"].stringSub(currentAmount, tradedAmount);
+                if (Precise["default"].stringLe(remainingAmount, '0')) {
+                    // fully filled, storing a zero amount deletes the order
+                    orderSide.storeArray([price, 0, orderId]);
+                }
+                else {
+                    orderSide.storeArray([price, this.parseNumber(remainingAmount), orderId]);
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * @ignore
+     * @method
+     * @name luno#isOrderBookDeltaInSequence
+     * @description checks the sequence number of an orderbook delta frame against the stored book, and on a gap tears the connection down so that the next watch call resubscribes and receives a fresh snapshot
+     * @param {object} client the websocket client the frame arrived on
+     * @param {object} message the delta frame
+     * @param {string} symbol unified market symbol of the book
+     * @returns {boolean} true if the delta can be applied to the stored book, false if it must be discarded
+     */
+    isOrderBookDeltaInSequence(client, message, symbol) {
+        const orderbook = this.orderbooks[symbol];
+        const storedNonce = this.safeInteger(orderbook, 'nonce');
+        if (storedNonce === undefined) {
+            // no snapshot was received yet, deltas cannot be applied to an
+            // empty book: luno sends the snapshot as the first frame after
+            // the handshake, so discard the delta
+            return false;
+        }
+        const messageSequence = this.safeInteger(message, 'sequence');
+        if (messageSequence === undefined) {
+            return true;
+        }
+        if (messageSequence <= storedNonce) {
+            // an old or replayed frame, discard it
+            return false;
+        }
+        const expectedSequence = this.parseToInt(storedNonce) + 1;
+        if (messageSequence !== expectedSequence) {
+            // a gap in the sequence means a lost message and the book is
+            // unrecoverable on a live connection, because luno only sends
+            // a snapshot as the first frame after a fresh handshake:
+            // reset the client, which stops its keepalive and rejects
+            // every pending future on the connection, clear the
+            // subscription so that frames still arriving on the orphaned
+            // connection are ignored by handleMessage, and drop the
+            // client, so that the next watch call dials a new connection;
+            // the cached book is kept so references returned by earlier
+            // watchOrderBook calls stay live: clearing its nonce discards
+            // deltas until the fresh snapshot resets the book in place
+            orderbook['nonce'] = undefined;
+            const market = this.market(symbol);
+            const symbolValue = this.safeString(market, 'symbol', '');
+            const marketId = this.safeString(market, 'id', '');
+            const subscriptionHash = '/stream/' + marketId;
+            if (subscriptionHash in client.subscriptions) {
+                delete client.subscriptions[subscriptionHash];
+            }
+            const error = new errors.InvalidNonce(this.id + ' watchOrderBook() received an out-of-sequence update for ' + symbolValue + ', expected ' + expectedSequence.toString() + ' but got ' + messageSequence.toString());
+            client.reset(error);
+            delete this.clients[client.url];
+            return false;
+        }
+        return true;
+    }
+    handleMessage(client, message) {
+        const subscriptions = Object.values(client.subscriptions);
+        const subscriptionsLength = subscriptions.length;
+        if (subscriptionsLength === 0) {
+            // the subscription was dropped after a sequence gap, ignore the
+            // frames still arriving until the client resubscribes
+            return;
+        }
+        const handlers = [this.handleOrderBook, this.handleTrades];
+        for (let j = 0; j < handlers.length; j++) {
+            const handler = handlers[j];
+            handler.call(this, client, message, subscriptions[0]);
+        }
+    }
+}
+
+exports["default"] = luno;

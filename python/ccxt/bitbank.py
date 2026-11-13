@@ -4,6 +4,9 @@
 # https://github.com/ccxt/ccxt/blob/master/CONTRIBUTING.md#how-to-contribute-code
 
 from ccxt.base.exchange import Exchange
+from ccxt.abstract.bitbank import ImplicitAPI
+import hashlib
+from ccxt.base.types import Balances, Currency, DepositAddress, Int, Market, Num, Order, OrderBook, OrderSide, OrderType, Str, Ticker, Trade, TradingFees, Transaction
 from ccxt.base.errors import ExchangeError
 from ccxt.base.errors import AuthenticationError
 from ccxt.base.errors import PermissionDenied
@@ -11,21 +14,110 @@ from ccxt.base.errors import InsufficientFunds
 from ccxt.base.errors import InvalidOrder
 from ccxt.base.errors import OrderNotFound
 from ccxt.base.errors import InvalidNonce
+from ccxt.base.decimal_to_precision import TICK_SIZE
 
 
-class bitbank(Exchange):
+class bitbank(Exchange, ImplicitAPI):
 
-    def describe(self):
+    def describe(self) -> dict:
         return self.deep_extend(super(bitbank, self).describe(), {
             'id': 'bitbank',
             'name': 'bitbank',
             'countries': ['JP'],
             'version': 'v1',
+            'rateLimit': 100,  # https://github.com/bitbankinc/bitbank-api-docs/blob/master/rest-api.md#rate-limit
             'has': {
-                'fetchOHLCV': True,
-                'fetchOpenOrders': True,
-                'fetchMyTrades': True,
+                'CORS': None,
+                'spot': True,
+                'margin': False,
+                'swap': False,
+                'future': False,
+                'option': False,
+                'addMargin': False,
+                'borrowCrossMargin': False,
+                'borrowIsolatedMargin': False,
+                'borrowMargin': False,
+                'cancelAllOrders': False,
+                'cancelOrder': True,
+                'closeAllPositions': False,
+                'closePosition': False,
+                'createOrder': True,
+                'createOrderWithTakeProfitAndStopLoss': False,
+                'createOrderWithTakeProfitAndStopLossWs': False,
+                'createReduceOnlyOrder': False,
+                'fetchBalance': True,
+                'fetchBorrowInterest': False,
+                'fetchBorrowRate': False,
+                'fetchBorrowRateHistories': False,
+                'fetchBorrowRateHistory': False,
+                'fetchBorrowRates': False,
+                'fetchBorrowRatesPerSymbol': False,
+                'fetchCrossBorrowRate': False,
+                'fetchCrossBorrowRates': False,
+                'fetchCurrencies': False,
                 'fetchDepositAddress': True,
+                'fetchDepositAddresses': False,
+                'fetchDepositAddressesByNetwork': False,
+                'fetchFundingHistory': False,
+                'fetchFundingInterval': False,
+                'fetchFundingIntervals': False,
+                'fetchFundingRate': False,
+                'fetchFundingRateHistory': False,
+                'fetchFundingRates': False,
+                'fetchGreeks': False,
+                'fetchIndexOHLCV': False,
+                'fetchIsolatedBorrowRate': False,
+                'fetchIsolatedBorrowRates': False,
+                'fetchIsolatedPositions': False,
+                'fetchLeverage': False,
+                'fetchLeverages': False,
+                'fetchLeverageTiers': False,
+                'fetchLiquidations': False,
+                'fetchLongShortRatio': False,
+                'fetchLongShortRatioHistory': False,
+                'fetchMarginAdjustmentHistory': False,
+                'fetchMarginMode': False,
+                'fetchMarginModes': False,
+                'fetchMarketLeverageTiers': False,
+                'fetchMarkets': True,
+                'fetchMarkOHLCV': False,
+                'fetchMarkPrices': False,
+                'fetchMyLiquidations': False,
+                'fetchMySettlementHistory': False,
+                'fetchMyTrades': True,
+                'fetchOHLCV': True,
+                'fetchOpenInterest': False,
+                'fetchOpenInterestHistory': False,
+                'fetchOpenInterests': False,
+                'fetchOpenOrders': True,
+                'fetchOption': False,
+                'fetchOptionChain': False,
+                'fetchOrder': True,
+                'fetchOrderBook': True,
+                'fetchPosition': False,
+                'fetchPositionHistory': False,
+                'fetchPositionMode': False,
+                'fetchPositions': False,
+                'fetchPositionsForSymbol': False,
+                'fetchPositionsHistory': False,
+                'fetchPositionsRisk': False,
+                'fetchPremiumIndexOHLCV': False,
+                'fetchSettlementHistory': False,
+                'fetchTicker': True,
+                'fetchTrades': True,
+                'fetchTradingFee': False,
+                'fetchTradingFees': True,
+                'fetchTransfer': False,
+                'fetchTransfers': False,
+                'fetchVolatilityHistory': False,
+                'reduceMargin': False,
+                'repayCrossMargin': False,
+                'repayIsolatedMargin': False,
+                'setLeverage': False,
+                'setMargin': False,
+                'setMarginMode': False,
+                'setPositionMode': False,
+                'transfer': False,
                 'withdraw': True,
             },
             'timeframes': {
@@ -40,11 +132,13 @@ class bitbank(Exchange):
                 '1d': '1day',
                 '1w': '1week',
             },
+            'hostname': 'bitbank.cc',
             'urls': {
-                'logo': 'https://user-images.githubusercontent.com/1294454/37808081-b87f2d9c-2e59-11e8-894d-c1900b7584fe.jpg',
+                'logo': 'https://github.com/user-attachments/assets/9d616de0-8a88-4468-8e38-d269acab0348',
                 'api': {
-                    'public': 'https://public.bitbank.cc',
-                    'private': 'https://api.bitbank.cc',
+                    'public': 'https://public.{hostname}',
+                    'private': 'https://api.{hostname}',
+                    'markets': 'https://api.{hostname}',
                 },
                 'www': 'https://bitbank.cc/',
                 'doc': 'https://docs.bitbank.cc/',
@@ -52,96 +146,246 @@ class bitbank(Exchange):
             },
             'api': {
                 'public': {
-                    'get': [
-                        '{pair}/ticker',
-                        '{pair}/depth',
-                        '{pair}/transactions',
-                        '{pair}/transactions/{yyyymmdd}',
-                        '{pair}/candlestick/{candletype}/{yyyymmdd}',
-                    ],
+                    'get': {
+                        '{pair}/ticker': {'cost': 1},
+                        'tickers': {'cost': 1},
+                        'tickers_jpy': {'cost': 1},
+                        '{pair}/depth': {'cost': 1},
+                        '{pair}/transactions': {'cost': 1},
+                        '{pair}/transactions/{yyyymmdd}': {'cost': 1},
+                        '{pair}/candlestick/{candletype}/{yyyymmdd}': {'cost': 1},
+                        '{pair}/circuit_break_info': {'cost': 1},
+                    },
                 },
                 'private': {
-                    'get': [
-                        'user/assets',
-                        'user/spot/order',
-                        'user/spot/active_orders',
-                        'user/spot/trade_history',
-                        'user/withdrawal_account',
-                    ],
-                    'post': [
-                        'user/spot/order',
-                        'user/spot/cancel_order',
-                        'user/spot/cancel_orders',
-                        'user/spot/orders_info',
-                        'user/request_withdrawal',
-                    ],
+                    'get': {
+                        'user/assets': {'cost': 1},
+                        'user/spot/order': {'cost': 1},
+                        'user/spot/active_orders': {'cost': 1},
+                        'user/margin/status': {'cost': 1},
+                        'user/margin/positions': {'cost': 1},
+                        'user/spot/trade_history': {'cost': 1},
+                        'user/deposit_history': {'cost': 1},
+                        'user/unconfirmed_deposits': {'cost': 1},
+                        'user/deposit_originators': {'cost': 1},
+                        'user/withdrawal_account': {'cost': 1},
+                        'user/withdrawal_history': {'cost': 1},
+                        'spot/status': {'cost': 1},
+                        'spot/pairs': {'cost': 1},
+                    },
+                    'post': {
+                        'user/spot/order': {'cost': 1.66},
+                        'user/spot/cancel_order': {'cost': 1.66},
+                        'user/spot/cancel_orders': {'cost': 1.66},
+                        'user/spot/orders_info': {'cost': 1.66},  # might be 10/s, based on docs at https://github.com/bitbankinc/bitbank-api-docs/blob/master/rest-api.md#rate-limit
+                        'user/confirm_deposits': {'cost': 1.66},  # might be 10/s, based on docs at https://github.com/bitbankinc/bitbank-api-docs/blob/master/rest-api.md#rate-limit
+                        'user/confirm_deposits_all': {'cost': 1.66},  # might be 10/s, based on docs at https://github.com/bitbankinc/bitbank-api-docs/blob/master/rest-api.md#rate-limit
+                        'user/request_withdrawal': {'cost': 1.66},
+                    },
                 },
-            },
-            'markets': {
-                'BCH/BTC': {'id': 'bcc_btc', 'symbol': 'BCH/BTC', 'base': 'BCH', 'quote': 'BTC', 'baseId': 'bcc', 'quoteId': 'btc'},
-                'BCH/JPY': {'id': 'bcc_jpy', 'symbol': 'BCH/JPY', 'base': 'BCH', 'quote': 'JPY', 'baseId': 'bcc', 'quoteId': 'jpy'},
-                'MONA/BTC': {'id': 'mona_btc', 'symbol': 'MONA/BTC', 'base': 'MONA', 'quote': 'BTC', 'baseId': 'mona', 'quoteId': 'btc'},
-                'MONA/JPY': {'id': 'mona_jpy', 'symbol': 'MONA/JPY', 'base': 'MONA', 'quote': 'JPY', 'baseId': 'mona', 'quoteId': 'jpy'},
-                'ETH/BTC': {'id': 'eth_btc', 'symbol': 'ETH/BTC', 'base': 'ETH', 'quote': 'BTC', 'baseId': 'eth', 'quoteId': 'btc'},
-                'LTC/BTC': {'id': 'ltc_btc', 'symbol': 'LTC/BTC', 'base': 'LTC', 'quote': 'BTC', 'baseId': 'ltc', 'quoteId': 'btc'},
-                'XRP/JPY': {'id': 'xrp_jpy', 'symbol': 'XRP/JPY', 'base': 'XRP', 'quote': 'JPY', 'baseId': 'xrp', 'quoteId': 'jpy'},
-                'BTC/JPY': {'id': 'btc_jpy', 'symbol': 'BTC/JPY', 'base': 'BTC', 'quote': 'JPY', 'baseId': 'btc', 'quoteId': 'jpy'},
-            },
-            'fees': {
-                'trading': {
-                    'maker': -0.02 / 100,
-                    'taker': 0.12 / 100,
-                },
-                'funding': {
-                    'withdraw': {
-                        # 'JPY': 756 if (amount > 30000) else 540,
-                        'BTC': 0.001,
-                        'LTC': 0.001,
-                        'XRP': 0.15,
-                        'ETH': 0.0005,
-                        'MONA': 0.001,
-                        'BCC': 0.001,
+                'markets': {
+                    'get': {
+                        'spot/pairs': {'cost': 1},
                     },
                 },
             },
-            'precision': {
-                'price': 8,
-                'amount': 8,
+            'features': {
+                'spot': {
+                    'sandbox': False,
+                    'createOrder': {
+                        'marginMode': False,
+                        'triggerPrice': True,  # todo implement
+                        'triggerPriceType': None,
+                        'triggerDirection': False,
+                        'stopLossPrice': False,
+                        'takeProfitPrice': False,
+                        'attachedStopLossTakeProfit': None,
+                        'timeInForce': {
+                            'IOC': False,
+                            'FOK': False,
+                            'PO': True,  # todo: implement
+                            'GTD': False,
+                        },
+                        'hedged': False,
+                        'trailing': False,
+                        'leverage': False,
+                        'marketBuyRequiresPrice': False,
+                        'marketBuyByCost': False,
+                        'selfTradePrevention': False,
+                        'iceberg': False,
+                    },
+                    'createOrders': None,
+                    'fetchMyTrades': {
+                        'marginMode': False,
+                        'limit': 1000,
+                        'daysBack': None,
+                        'untilDays': None,
+                        'symbolRequired': False,
+                    },
+                    'fetchOrder': {
+                        'marginMode': False,
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': False,
+                    },
+                    'fetchOpenOrders': {
+                        'marginMode': False,
+                        'limit': 1000,
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': False,
+                    },
+                    'fetchOrders': None,
+                    'fetchClosedOrders': None,
+                    'fetchOHLCV': {
+                        'limit': 1000,
+                    },
+                },
+                'swap': {
+                    'linear': None,
+                    'inverse': None,
+                },
+                'future': {
+                    'linear': None,
+                    'inverse': None,
+                },
             },
+            'precisionMode': TICK_SIZE,
             'exceptions': {
-                '20001': AuthenticationError,
-                '20002': AuthenticationError,
-                '20003': AuthenticationError,
-                '20005': AuthenticationError,
-                '20004': InvalidNonce,
-                '40020': InvalidOrder,
-                '40021': InvalidOrder,
-                '40025': ExchangeError,
-                '40013': OrderNotFound,
-                '40014': OrderNotFound,
-                '50008': PermissionDenied,
-                '50009': OrderNotFound,
-                '50010': OrderNotFound,
-                '60001': InsufficientFunds,
-                '60005': InvalidOrder,
+                'exact': {
+                    '20001': AuthenticationError,
+                    '20002': AuthenticationError,
+                    '20003': AuthenticationError,
+                    '20005': AuthenticationError,
+                    '20004': InvalidNonce,
+                    '40020': InvalidOrder,
+                    '40021': InvalidOrder,
+                    '40025': ExchangeError,
+                    '40013': OrderNotFound,
+                    '40014': OrderNotFound,
+                    '50008': PermissionDenied,
+                    '50009': OrderNotFound,
+                    '50010': OrderNotFound,
+                    '60001': InsufficientFunds,
+                    '60005': InvalidOrder,
+                },
             },
         })
 
-    def parse_ticker(self, ticker, market=None):
-        symbol = None
-        if market is not None:
-            symbol = market['symbol']
+    def fetch_markets(self, params: dict = {}) -> list[Market]:
+        """
+        retrieves data on all markets for bitbank
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/rest-api.md#get-all-pairs-info
+
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict[]: an array of objects representing market data
+        """
+        response = self.marketsGetSpotPairs(params)
+        #
+        #     {
+        #       "success": 1,
+        #       "data": {
+        #         "pairs": [
+        #           {
+        #             "name": "btc_jpy",
+        #             "base_asset": "btc",
+        #             "quote_asset": "jpy",
+        #             "maker_fee_rate_base": "0",
+        #             "taker_fee_rate_base": "0",
+        #             "maker_fee_rate_quote": "-0.0002",
+        #             "taker_fee_rate_quote": "0.0012",
+        #             "unit_amount": "0.0001",
+        #             "limit_max_amount": "1000",
+        #             "market_max_amount": "10",
+        #             "market_allowance_rate": "0.2",
+        #             "price_digits": 0,
+        #             "amount_digits": 4,
+        #             "is_enabled": true,
+        #             "stop_order": false,
+        #             "stop_order_and_cancel": false
+        #           }
+        #         ]
+        #       }
+        #     }
+        #
+        data = self.safe_dict(response, 'data')
+        pairs = self.safe_list(data, 'pairs', [])
+        return self.parse_markets(pairs)
+
+    def parse_market(self, entry: dict) -> Market:
+        id = self.safe_string(entry, 'name')
+        baseId = self.safe_string(entry, 'base_asset')
+        quoteId = self.safe_string(entry, 'quote_asset')
+        base = self.safe_currency_code(baseId)
+        quote = self.safe_currency_code(quoteId)
+        if (base is None) or (quote is None):
+            return None
+        return self.safe_market_structure({
+            'id': id,
+            'symbol': base + '/' + quote,
+            'base': base,
+            'quote': quote,
+            'settle': None,
+            'baseId': baseId,
+            'quoteId': quoteId,
+            'settleId': None,
+            'type': 'spot',
+            'spot': True,
+            'margin': False,
+            'swap': False,
+            'future': False,
+            'option': False,
+            'active': self.safe_bool(entry, 'is_enabled'),
+            'contract': False,
+            'linear': None,
+            'inverse': None,
+            'taker': self.safe_number(entry, 'taker_fee_rate_quote'),
+            'maker': self.safe_number(entry, 'maker_fee_rate_quote'),
+            'contractSize': None,
+            'expiry': None,
+            'expiryDatetime': None,
+            'strike': None,
+            'optionType': None,
+            'precision': {
+                'amount': self.parse_number(self.parse_precision(self.safe_string(entry, 'amount_digits'))),
+                'price': self.parse_number(self.parse_precision(self.safe_string(entry, 'price_digits'))),
+            },
+            'limits': {
+                'leverage': {
+                    'min': None,
+                    'max': None,
+                },
+                'amount': {
+                    'min': self.safe_number(entry, 'unit_amount'),
+                    'max': self.safe_number(entry, 'limit_max_amount'),
+                },
+                'price': {
+                    'min': None,
+                    'max': None,
+                },
+                'cost': {
+                    'min': None,
+                    'max': None,
+                },
+            },
+            'created': None,
+            'info': entry,
+        })
+
+    def parse_ticker(self, ticker: dict, market: Market = None) -> Ticker:
+        symbol = self.safe_symbol(None, market)
         timestamp = self.safe_integer(ticker, 'timestamp')
-        last = self.safe_float(ticker, 'last')
-        return {
+        last = self.safe_string(ticker, 'last')
+        return self.safe_ticker({
             'symbol': symbol,
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
-            'high': self.safe_float(ticker, 'high'),
-            'low': self.safe_float(ticker, 'low'),
-            'bid': self.safe_float(ticker, 'buy'),
+            'high': self.safe_string(ticker, 'high'),
+            'low': self.safe_string(ticker, 'low'),
+            'bid': self.safe_string(ticker, 'buy'),
             'bidVolume': None,
-            'ask': self.safe_float(ticker, 'sell'),
+            'ask': self.safe_string(ticker, 'sell'),
             'askVolume': None,
             'vwap': None,
             'open': None,
@@ -151,123 +395,320 @@ class bitbank(Exchange):
             'change': None,
             'percentage': None,
             'average': None,
-            'baseVolume': self.safe_float(ticker, 'vol'),
+            'baseVolume': self.safe_string(ticker, 'vol'),
             'quoteVolume': None,
             'info': ticker,
-        }
+        }, market)
 
-    def fetch_ticker(self, symbol, params={}):
-        self.load_markets()
+    def fetch_ticker(self, symbol: str, params: dict = {}) -> Ticker:
+        """
+        fetches a price ticker, a statistical calculation with the information calculated over the past 24 hours for a specific market
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/public-api.md#ticker
+
+        :param str symbol: unified symbol of the market to fetch the ticker for
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a `ticker structure <https://docs.ccxt.com/?id=ticker-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         market = self.market(symbol)
         request = {
             'pair': market['id'],
         }
         response = self.publicGetPairTicker(self.extend(request, params))
-        return self.parse_ticker(response['data'], market)
+        data = self.safe_dict(response, 'data', {})
+        return self.parse_ticker(data, market)
 
-    def fetch_order_book(self, symbol, limit=None, params={}):
-        self.load_markets()
+    def fetch_order_book(self, symbol: str, limit: Int = None, params: dict = {}) -> OrderBook:
+        """
+        fetches information on open orders with bid(buy) and ask(sell) prices, volumes and other data
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/public-api.md#depth
+
+        :param str symbol: unified symbol of the market to fetch the order book for
+        :param int [limit]: the maximum amount of order book entries to return
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `order book structure <https://docs.ccxt.com/?id=order-book-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
+        market = self.market(symbol)
         request = {
-            'pair': self.market_id(symbol),
+            'pair': market['id'],
         }
         response = self.publicGetPairDepth(self.extend(request, params))
-        orderbook = self.safe_value(response, 'data', {})
+        orderbook = self.safe_dict(response, 'data', {})
         timestamp = self.safe_integer(orderbook, 'timestamp')
-        return self.parse_order_book(orderbook, timestamp)
+        return self.parse_order_book(orderbook, market['symbol'], timestamp)
 
-    def parse_trade(self, trade, market=None):
+    def parse_trade(self, trade: dict, market: Market = None) -> Trade:
+        #
+        # fetchTrades
+        #
+        #    {
+        #        "transaction_id": "1143247037",
+        #        "side": "buy",
+        #        "price": "3836025",
+        #        "amount": "0.0005",
+        #        "executed_at": "1694249441593"
+        #    }
+        #
         timestamp = self.safe_integer(trade, 'executed_at')
-        symbol = None
-        feeCurrency = None
-        if market is not None:
-            symbol = market['symbol']
-            feeCurrency = market['quote']
-        price = self.safe_float(trade, 'price')
-        amount = self.safe_float(trade, 'amount')
-        cost = None
-        if price is not None:
-            if amount is not None:
-                cost = float(self.cost_to_precision(symbol, price * amount))
+        marketResolved = self.safe_market(None, market)
+        priceString = self.safe_string(trade, 'price')
+        amountString = self.safe_string(trade, 'amount')
         id = self.safe_string_2(trade, 'transaction_id', 'trade_id')
         takerOrMaker = self.safe_string(trade, 'maker_taker')
         fee = None
-        feeCost = self.safe_float(trade, 'fee_amount_quote')
-        if feeCost is not None:
+        feeCostString = self.safe_string(trade, 'fee_amount_quote')
+        if feeCostString is not None:
             fee = {
-                'currency': market['quote'],
-                'cost': feeCurrency,
+                'currency': marketResolved['quote'],
+                'cost': feeCostString,
             }
         orderId = self.safe_string(trade, 'order_id')
         type = self.safe_string(trade, 'type')
         side = self.safe_string(trade, 'side')
-        return {
+        return self.safe_trade({
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
-            'symbol': symbol,
+            'symbol': marketResolved['symbol'],
             'id': id,
             'order': orderId,
             'type': type,
             'side': side,
             'takerOrMaker': takerOrMaker,
-            'price': price,
-            'amount': amount,
-            'cost': cost,
+            'price': priceString,
+            'amount': amountString,
+            'cost': None,
             'fee': fee,
             'info': trade,
-        }
+        }, marketResolved)
 
-    def fetch_trades(self, symbol, since=None, limit=None, params={}):
-        self.load_markets()
+    def fetch_trades(self, symbol: str, since: Int = None, limit: Int = None, params: dict = {}) -> list[Trade]:
+        """
+        get the list of most recent trades for a particular symbol
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/public-api.md#transactions
+
+        :param str symbol: unified symbol of the market to fetch trades for
+        :param int [since]: timestamp in ms of the earliest trade to fetch
+        :param int [limit]: the maximum amount of trades to fetch
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Trade[]: a list of `trade structures <https://docs.ccxt.com/?id=public-trades>`
+        """
+        if self.markets is None:
+            self.load_markets()
         market = self.market(symbol)
         request = {
             'pair': market['id'],
         }
         response = self.publicGetPairTransactions(self.extend(request, params))
-        return self.parse_trades(response['data']['transactions'], market, since, limit)
+        data = self.safe_dict(response, 'data', {})
+        trades = self.safe_list(data, 'transactions', [])
+        return self.parse_trades(trades, market, since, limit)
 
-    def parse_ohlcv(self, ohlcv, market=None, timeframe='5m', since=None, limit=None):
+    def fetch_trading_fees(self, params: dict = {}) -> TradingFees:
+        """
+        fetch the trading fees for multiple markets
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/rest-api.md#get-all-pairs-info
+
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a dictionary of `fee structures <https://docs.ccxt.com/?id=fee-structure>` indexed by market symbols
+        """
+        if self.markets is None:
+            self.load_markets()
+        response = self.marketsGetSpotPairs(params)
+        #
+        #     {
+        #         "success": "1",
+        #         "data": {
+        #           "pairs": [
+        #             {
+        #               "name": "btc_jpy",
+        #               "base_asset": "btc",
+        #               "quote_asset": "jpy",
+        #               "maker_fee_rate_base": "0",
+        #               "taker_fee_rate_base": "0",
+        #               "maker_fee_rate_quote": "-0.0002",
+        #               "taker_fee_rate_quote": "0.0012",
+        #               "unit_amount": "0.0001",
+        #               "limit_max_amount": "1000",
+        #               "market_max_amount": "10",
+        #               "market_allowance_rate": "0.2",
+        #               "price_digits": "0",
+        #               "amount_digits": "4",
+        #               "is_enabled": true,
+        #               "stop_order": false,
+        #               "stop_order_and_cancel": false
+        #             },
+        #             ...
+        #           ]
+        #         }
+        #     }
+        #
+        data = self.safe_dict(response, 'data', {})
+        pairs = self.safe_list(data, 'pairs', [])
+        result = {}
+        for i in range(0, len(pairs)):
+            pair = pairs[i]
+            marketId = self.safe_string(pair, 'name')
+            market = self.safe_market(marketId)
+            symbol = self.safe_string(market, 'symbol', '')
+            result[symbol] = {
+                'info': pair,
+                'symbol': symbol,
+                'maker': self.safe_number(pair, 'maker_fee_rate_quote'),
+                'taker': self.safe_number(pair, 'taker_fee_rate_quote'),
+                'percentage': True,
+                'tierBased': False,
+            }
+        return result
+
+    def parse_ohlcv(self, ohlcv: object, market: Market = None) -> list:
+        #
+        #     [
+        #         "0.02501786",
+        #         "0.02501786",
+        #         "0.02501786",
+        #         "0.02501786",
+        #         "0.0000",
+        #         1591488000000
+        #     ]
+        #
         return [
-            ohlcv[5],
-            float(ohlcv[0]),
-            float(ohlcv[1]),
-            float(ohlcv[2]),
-            float(ohlcv[3]),
-            float(ohlcv[4]),
+            self.safe_integer(ohlcv, 5),
+            self.safe_number(ohlcv, 0),
+            self.safe_number(ohlcv, 1),
+            self.safe_number(ohlcv, 2),
+            self.safe_number(ohlcv, 3),
+            self.safe_number(ohlcv, 4),
         ]
 
-    def fetch_ohlcv(self, symbol, timeframe='5m', since=None, limit=None, params={}):
-        self.load_markets()
+    def fetch_ohlcv(self, symbol: str, timeframe: str = '1m', since: Int = None, limit: Int = None, params: dict = {}) -> list[list]:
+        """
+        fetches historical candlestick data containing the open, high, low, and close price, and the volume of a market
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/public-api.md#candlestick
+
+        :param str symbol: unified symbol of the market to fetch OHLCV data for
+        :param str timeframe: the length of time each candle represents
+        :param int [since]: timestamp in ms of the earliest candle to fetch
+        :param int [limit]: the maximum amount of candles to fetch
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns int[][]: A list of candles ordered as timestamp, open, high, low, close, volume
+        """
+        # it doesn't have any defaults, might return 200, might 2000 (i.e. https://public.bitbank.cc/btc_jpy/candlestick/4hour/2020)
+        windowLimit = 1000 if (limit is None) else limit
+        limitResolved = windowLimit if (since is None) else limit
+        duration = self.parse_timeframe(timeframe)
+        windowMs = duration * 1000 * 1000
+        if limit is not None:
+            windowMs = duration * 1000 * limit
+        sinceResolved = self.milliseconds() - windowMs if (since is None) else since
+        if self.markets is None:
+            self.load_markets()
         market = self.market(symbol)
-        date = self.milliseconds()
-        date = self.ymd(date)
-        date = date.split('-')
         request = {
             'pair': market['id'],
-            'candletype': self.timeframes[timeframe],
-            'yyyymmdd': ''.join(date),
+            'candletype': self.safe_string(self.timeframes, timeframe, timeframe),
+            'yyyymmdd': self.yyyymmdd(sinceResolved, ''),
         }
         response = self.publicGetPairCandlestickCandletypeYyyymmdd(self.extend(request, params))
-        ohlcv = self.safe_value(response['data']['candlestick'][0], 'ohlcv')
-        return self.parse_ohlcvs(ohlcv, market, timeframe, since, limit)
+        #
+        #     {
+        #         "success":1,
+        #         "data":{
+        #             "candlestick":[
+        #                 {
+        #                     "type":"5min",
+        #                     "ohlcv":[
+        #                         ["0.02501786","0.02501786","0.02501786","0.02501786","0.0000",1591488000000],
+        #                         ["0.02501747","0.02501953","0.02501747","0.02501953","0.3017",1591488300000],
+        #                         ["0.02501762","0.02501762","0.02500392","0.02500392","0.1500",1591488600000],
+        #                     ]
+        #                 }
+        #             ],
+        #             "timestamp":1591508668190
+        #         }
+        #     }
+        #
+        data = self.safe_dict(response, 'data', {})
+        candlestick = self.safe_list(data, 'candlestick', [])
+        first = self.safe_dict(candlestick, 0, {})
+        ohlcv = self.safe_list(first, 'ohlcv', [])
+        return self.parse_ohlcvs(ohlcv, market, timeframe, sinceResolved, limitResolved)
 
-    def fetch_balance(self, params={}):
-        self.load_markets()
-        response = self.privateGetUserAssets(params)
-        result = {'info': response}
-        balances = response['data']['assets']
-        for i in range(0, len(balances)):
-            balance = balances[i]
+    def parse_balance(self, response: dict) -> Balances:
+        result = {
+            'info': response,
+            'timestamp': None,
+            'datetime': None,
+        }
+        data = self.safe_dict(response, 'data', {})
+        assets = self.safe_list(data, 'assets', [])
+        for i in range(0, len(assets)):
+            balance = self.safe_dict(assets, i)
             currencyId = self.safe_string(balance, 'asset')
             code = self.safe_currency_code(currencyId)
-            account = {
-                'free': self.safe_float(balance, 'free_amount'),
-                'used': self.safe_float(balance, 'locked_amount'),
-                'total': self.safe_float(balance, 'onhand_amount'),
-            }
-            result[code] = account
-        return self.parse_balance(result)
+            account = self.account()
+            account['free'] = self.safe_string(balance, 'free_amount')
+            account['used'] = self.safe_string(balance, 'locked_amount')
+            account['total'] = self.safe_string(balance, 'onhand_amount')
+            if code is not None:
+                result[code] = account
+        return self.safe_balance(result)
 
-    def parse_order_status(self, status):
+    def fetch_balance(self, params: dict = {}) -> Balances:
+        """
+        query for balance and get the amount of funds available for trading or funds locked in orders
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/rest-api.md#assets
+
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a `balance structure <https://docs.ccxt.com/?id=balance-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
+        response = self.privateGetUserAssets(params)
+        #
+        #     {
+        #       "success": "1",
+        #       "data": {
+        #         "assets": [
+        #           {
+        #             "asset": "jpy",
+        #             "amount_precision": "4",
+        #             "onhand_amount": "0.0000",
+        #             "locked_amount": "0.0000",
+        #             "free_amount": "0.0000",
+        #             "stop_deposit": false,
+        #             "stop_withdrawal": false,
+        #             "withdrawal_fee": {
+        #               "threshold": "30000.0000",
+        #               "under": "550.0000",
+        #               "over": "770.0000"
+        #             }
+        #           },
+        #           {
+        #             "asset": "btc",
+        #             "amount_precision": "8",
+        #             "onhand_amount": "0.00000000",
+        #             "locked_amount": "0.00000000",
+        #             "free_amount": "0.00000000",
+        #             "stop_deposit": false,
+        #             "stop_withdrawal": false,
+        #             "withdrawal_fee": "0.00060000"
+        #           },
+        #         ]
+        #       }
+        #     }
+        #
+        return self.parse_balance(response)
+
+    def parse_order_status(self, status: Str) -> Str:
         statuses = {
             'UNFILLED': 'open',
             'PARTIALLY_FILLED': 'open',
@@ -277,39 +718,34 @@ class bitbank(Exchange):
         }
         return self.safe_string(statuses, status, status)
 
-    def parse_order(self, order, market=None):
+    def parse_order(self, order: dict, market: Market = None) -> Order:
         id = self.safe_string(order, 'order_id')
         marketId = self.safe_string(order, 'pair')
-        symbol = None
-        if marketId and not market and (marketId in self.marketsById):
-            market = self.marketsById[marketId]
-        if market is not None:
-            symbol = market['symbol']
+        marketResolved = self.safe_market(marketId, market)
         timestamp = self.safe_integer(order, 'ordered_at')
-        price = self.safe_float(order, 'price')
-        amount = self.safe_float(order, 'start_amount')
-        filled = self.safe_float(order, 'executed_amount')
-        remaining = self.safe_float(order, 'remaining_amount')
-        average = self.safe_float(order, 'average_price')
-        cost = None
-        if filled is not None:
-            if average is not None:
-                cost = filled * average
+        price = self.safe_string(order, 'price')
+        amount = self.safe_string(order, 'start_amount')
+        filled = self.safe_string(order, 'executed_amount')
+        remaining = self.safe_string(order, 'remaining_amount')
+        average = self.safe_string(order, 'average_price')
         status = self.parse_order_status(self.safe_string(order, 'status'))
         type = self.safe_string_lower(order, 'type')
         side = self.safe_string_lower(order, 'side')
-        return {
+        return self.safe_order({
             'id': id,
             'clientOrderId': None,
             'datetime': self.iso8601(timestamp),
             'timestamp': timestamp,
             'lastTradeTimestamp': None,
             'status': status,
-            'symbol': symbol,
+            'symbol': marketResolved['symbol'],
             'type': type,
+            'timeInForce': None,
+            'postOnly': None,
             'side': side,
             'price': price,
-            'cost': cost,
+            'triggerPrice': None,
+            'cost': None,
             'average': average,
             'amount': amount,
             'filled': filled,
@@ -317,48 +753,140 @@ class bitbank(Exchange):
             'trades': None,
             'fee': None,
             'info': order,
-        }
+        }, marketResolved)
 
-    def create_order(self, symbol, type, side, amount, price=None, params={}):
-        self.load_markets()
+    def create_order(self, symbol: str, type: OrderType, side: OrderSide, amount: float, price: Num = None, params: dict = {}) -> Order:
+        """
+        create a trade order
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/rest-api.md#create-new-order
+
+        :param str symbol: unified symbol of the market to create an order in
+        :param str type: 'market' or 'limit'
+        :param str side: 'buy' or 'sell'
+        :param float amount: how much of currency you want to trade in units of base currency
+        :param float [price]: the price at which the order is to be fulfilled, in units of the quote currency, ignored in market orders
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         market = self.market(symbol)
-        if price is None:
-            raise InvalidOrder(self.id + ' createOrder requires a price argument for both market and limit orders')
         request = {
             'pair': market['id'],
             'amount': self.amount_to_precision(symbol, amount),
-            'price': self.price_to_precision(symbol, price),
             'side': side,
             'type': type,
         }
+        if type == 'limit':
+            request['price'] = self.price_to_precision(symbol, price)
         response = self.privatePostUserSpotOrder(self.extend(request, params))
-        order = self.parse_order(response['data'], market)
-        id = order['id']
-        self.orders[id] = order
-        return order
+        data = self.safe_dict(response, 'data')
+        return self.parse_order(data, market)
 
-    def cancel_order(self, id, symbol=None, params={}):
-        self.load_markets()
+    def cancel_order(self, id: str, symbol: Str = None, params: dict = {}) -> Order:
+        """
+        cancels an open order
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/rest-api.md#cancel-order
+
+        :param str id: order id
+        :param str symbol: unified symbol of the market the order was made in
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: An `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         market = self.market(symbol)
         request = {
             'order_id': id,
             'pair': market['id'],
         }
         response = self.privatePostUserSpotCancelOrder(self.extend(request, params))
-        return response['data']
+        #
+        #    {
+        #        "success": 1,
+        #        "data": {
+        #            "order_id": 0,
+        #            "pair": "string",
+        #            "side": "string",
+        #            "type": "string",
+        #            "start_amount": "string",
+        #            "remaining_amount": "string",
+        #            "executed_amount": "string",
+        #            "price": "string",
+        #            "post_only": false,
+        #            "average_price": "string",
+        #            "ordered_at": 0,
+        #            "expire_at": 0,
+        #            "canceled_at": 0,
+        #            "triggered_at": 0,
+        #            "trigger_price": "string",
+        #            "status": "string"
+        #        }
+        #    }
+        #
+        data = self.safe_dict(response, 'data')
+        return self.parse_order(data)
 
-    def fetch_order(self, id, symbol=None, params={}):
-        self.load_markets()
+    def fetch_order(self, id: str, symbol: Str = None, params: dict = {}) -> Order:
+        """
+        fetches information on an order made by the user
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/rest-api.md#fetch-order-information
+
+        :param str id: the order id
+        :param str symbol: unified symbol of the market the order was made in
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: An `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         market = self.market(symbol)
         request = {
             'order_id': id,
             'pair': market['id'],
         }
         response = self.privateGetUserSpotOrder(self.extend(request, params))
-        return self.parse_order(response['data'])
+        #
+        #    {
+        #        "success": 1,
+        #        "data": {
+        #          "order_id": 0,
+        #          "pair": "string",
+        #          "side": "string",
+        #          "type": "string",
+        #          "start_amount": "string",
+        #          "remaining_amount": "string",
+        #          "executed_amount": "string",
+        #          "price": "string",
+        #          "post_only": false,
+        #          "average_price": "string",
+        #          "ordered_at": 0,
+        #          "expire_at": 0,
+        #          "triggered_at": 0,
+        #          "triger_price": "string",
+        #          "status": "string"
+        #        }
+        #    }
+        #
+        data = self.safe_dict(response, 'data')
+        return self.parse_order(data, market)
 
-    def fetch_open_orders(self, symbol=None, since=None, limit=None, params={}):
-        self.load_markets()
+    def fetch_open_orders(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Order]:
+        """
+        fetch all unfilled currently open orders
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/rest-api.md#fetch-active-orders
+
+        :param str symbol: unified market symbol
+        :param int [since]: the earliest time in ms to fetch open orders for
+        :param int [limit]: the maximum number of  open orders structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         market = self.market(symbol)
         request = {
             'pair': market['id'],
@@ -366,95 +894,219 @@ class bitbank(Exchange):
         if limit is not None:
             request['count'] = limit
         if since is not None:
-            request['since'] = int(since / 1000)
+            request['since'] = self.parse_to_int(since / 1000)
         response = self.privateGetUserSpotActiveOrders(self.extend(request, params))
-        return self.parse_orders(response['data']['orders'], market, since, limit)
+        data = self.safe_dict(response, 'data', {})
+        orders = self.safe_list(data, 'orders', [])
+        return self.parse_orders(orders, market, since, limit)
 
-    def fetch_my_trades(self, symbol=None, since=None, limit=None, params={}):
-        self.load_markets()
+    def fetch_my_trades(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Trade]:
+        """
+        fetch all trades made by the user
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/rest-api.md#fetch-trade-history
+
+        :param str symbol: unified market symbol
+        :param int [since]: the earliest time in ms to fetch trades for
+        :param int [limit]: the maximum number of trades structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Trade[]: a list of `trade structures <https://docs.ccxt.com/?id=trade-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
+        request = {}
         market = None
         if symbol is not None:
             market = self.market(symbol)
-        request = {}
-        if market is not None:
             request['pair'] = market['id']
         if limit is not None:
             request['count'] = limit
         if since is not None:
-            request['since'] = int(since / 1000)
+            request['since'] = self.parse_to_int(since / 1000)
         response = self.privateGetUserSpotTradeHistory(self.extend(request, params))
-        return self.parse_trades(response['data']['trades'], market, since, limit)
+        data = self.safe_dict(response, 'data', {})
+        trades = self.safe_list(data, 'trades', [])
+        return self.parse_trades(trades, market, since, limit)
 
-    def fetch_deposit_address(self, code, params={}):
-        self.load_markets()
+    def fetch_deposit_address(self, code: str, params: dict = {}) -> DepositAddress:
+        """
+        fetch the deposit address for a currency associated with self account
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/rest-api.md#get-withdrawal-accounts
+
+        :param str code: unified currency code
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `address structure <https://docs.ccxt.com/?id=address-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         currency = self.currency(code)
         request = {
             'asset': currency['id'],
         }
         response = self.privateGetUserWithdrawalAccount(self.extend(request, params))
-        # Not sure about self if there could be more than one account...
-        accounts = response['data']['accounts']
-        address = self.safe_string(accounts[0], 'address')
+        data = self.safe_dict(response, 'data', {})
+        # Not sure about this if there could be more than one account...
+        accounts = self.safe_list(data, 'accounts', [])
+        firstAccount = self.safe_dict(accounts, 0, {})
+        address = self.safe_string(firstAccount, 'address')
         return {
-            'currency': currency,
+            'info': response,
+            'currency': currency['code'],
+            'network': None,
             'address': address,
             'tag': None,
-            'info': response,
         }
 
-    def withdraw(self, code, amount, address, tag=None, params={}):
+    def withdraw(self, code: str, amount: float, address: str, params: dict = {}) -> Transaction:
+        """
+        make a withdrawal
+
+        https://github.com/bitbankinc/bitbank-api-docs/blob/38d6d7c6f486c793872fd4b4087a0d090a04cd0a/rest-api.md#new-withdrawal-request
+
+        :param str code: unified currency code
+        :param float amount: the amount to withdraw
+        :param str address: the address to withdraw to
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param str [params.tag]: memo / destination tag, required for currencies in options['withdrawTagRequiredCurrencies']
+        :returns dict: a `transaction structure <https://docs.ccxt.com/?id=transaction-structure>`
+        """
+        tagAndParams = self.handle_param_string(params, 'tag')
+        tagWithdrawTag = tagAndParams[0]
+        paramsWithdrawTag = tagAndParams[1]
+        self.check_address(address, code, tagWithdrawTag)
         if not ('uuid' in params):
             raise ExchangeError(self.id + ' uuid is required for withdrawal')
-        self.load_markets()
+        if self.markets is None:
+            self.load_markets()
         currency = self.currency(code)
         request = {
             'asset': currency['id'],
             'amount': amount,
         }
-        response = self.privatePostUserRequestWithdrawal(self.extend(request, params))
-        txid = self.safe_string(response['data'], 'txid')
+        response = self.privatePostUserRequestWithdrawal(self.extend(request, paramsWithdrawTag))
+        #
+        #     {
+        #         "success": 1,
+        #         "data": {
+        #             "uuid": "string",
+        #             "asset": "btc",
+        #             "amount": 0,
+        #             "account_uuid": "string",
+        #             "fee": 0,
+        #             "status": "DONE",
+        #             "label": "string",
+        #             "txid": "string",
+        #             "address": "string",
+        #             "requested_at": 0
+        #         }
+        #     }
+        #
+        data = self.safe_dict(response, 'data', {})
+        return self.parse_transaction(data, currency)
+
+    def parse_transaction(self, transaction: dict, currency: Currency = None) -> Transaction:
+        #
+        # withdraw
+        #
+        #     {
+        #         "uuid": "string",
+        #         "asset": "btc",
+        #         "amount": 0,
+        #         "account_uuid": "string",
+        #         "fee": 0,
+        #         "status": "DONE",
+        #         "label": "string",
+        #         "txid": "string",
+        #         "address": "string",
+        #         "requested_at": 0
+        #     }
+        #
+        txid = self.safe_string(transaction, 'txid')
+        currencyResolved = self.safe_currency(None, currency)
         return {
-            'info': response,
             'id': txid,
+            'txid': txid,
+            'timestamp': None,
+            'datetime': None,
+            'network': None,
+            'addressFrom': None,
+            'address': None,
+            'addressTo': None,
+            'amount': None,
+            'type': None,
+            'currency': currencyResolved['code'],
+            'status': None,
+            'updated': None,
+            'tagFrom': None,
+            'tag': None,
+            'tagTo': None,
+            'comment': None,
+            'internal': None,
+            'fee': None,
+            'info': transaction,
         }
 
-    def nonce(self):
+    def nonce(self) -> int:
         return self.milliseconds()
 
-    def sign(self, path, api='public', method='GET', params={}, headers=None, body=None):
-        query = self.omit(params, self.extract_params(path))
-        url = self.urls['api'][api] + '/'
-        if api == 'public':
+    def sign(self, path: str, api: list[str] = ['public'], method: str = 'GET', params: dict = {}) -> dict:
+        apiName = api[0]
+        query = self.extend({}, self.omit(params, self.extract_params(path)))
+        apiUrl = self.safe_string(self.urls['api'], apiName)
+        if apiUrl is None:
+            raise ExchangeError(self.id + ' sign() has no API URL for self endpoint')
+        url = self.implode_hostname(apiUrl) + '/'
+        requestBody = None
+        requestHeaders = None
+        if (apiName == 'public') or (apiName == 'markets'):
             url += self.implode_params(path, params)
-            if query:
+            if len(query) > 0:
                 url += '?' + self.urlencode(query)
         else:
             self.check_required_credentials()
-            nonce = str(self.nonce())
+            # bitbank supports two auth methods, see https://github.com/bitbankinc/bitbank-api-docs/blob/master/rest-api.md#authorization
+            # 'timeWindow' (default): request time + validity window, stateless and safe for concurrent use of one key
+            # 'nonce': legacy strictly-increasing nonce, kept as an escape hatch for clients with drifting clocks,
+            # since bitbank offers no server time endpoint to compensate against
+            authMethod = self.safe_string(self.options, 'authMethod', 'timeWindow')
+            isTimeWindow = (authMethod == 'timeWindow')
+            requestTime = str(self.milliseconds())
+            timeWindow = self.safe_string(self.options, 'timeWindow', '5000')
+            nonce = str(self.incrementing_nonce())
             auth = nonce
+            if isTimeWindow:
+                auth = requestTime + timeWindow
             url += self.version + '/' + self.implode_params(path, params)
             if method == 'POST':
-                body = self.json(query)
-                auth += body
+                jsonBody = self.json(query)
+                requestBody = jsonBody
+                auth += jsonBody
             else:
                 auth += '/' + self.version + '/' + path
-                if query:
-                    query = self.urlencode(query)
-                    url += '?' + query
-                    auth += '?' + query
-            headers = {
+                if len(query) > 0:
+                    queryString = self.urlencode(query)
+                    url += '?' + queryString
+                    auth += '?' + queryString
+            requestHeaders = {
                 'Content-Type': 'application/json',
                 'ACCESS-KEY': self.apiKey,
-                'ACCESS-NONCE': nonce,
-                'ACCESS-SIGNATURE': self.hmac(self.encode(auth), self.encode(self.secret)),
+                'ACCESS-SIGNATURE': self.hmac(self.encode(auth), self.encode(self.secret), hashlib.sha256),
             }
-        return {'url': url, 'method': method, 'body': body, 'headers': headers}
+            if isTimeWindow:
+                requestHeaders = self.extend(requestHeaders, {'ACCESS-REQUEST-TIME': requestTime, 'ACCESS-TIME-WINDOW': timeWindow})
+            else:
+                requestHeaders = self.extend(requestHeaders, {'ACCESS-NONCE': nonce})
+        bodyResolved = requestBody
+        headersResolved = requestHeaders
+        return {'url': url, 'method': method, 'body': bodyResolved, 'headers': headersResolved}
 
-    def request(self, path, api='public', method='GET', params={}, headers=None, body=None):
-        response = self.fetch2(path, api, method, params, headers, body)
+    def handle_errors(self, code: int, reason: str, url: str, method: str, headers: dict, body: str, response: object, requestHeaders: dict, requestBody: Str):
+        if response is None:
+            return None
         success = self.safe_integer(response, 'success')
-        data = self.safe_value(response, 'data')
-        if not success or not data:
+        data = self.safe_dict(response, 'data')
+        if (success is None or success == 0) or (data is None):
             errorMessages = {
                 '10000': 'URL does not exist',
                 '10001': 'A system error occurred. Please contact support',
@@ -517,12 +1169,8 @@ class bitbank(Exchange):
                 '70009': 'We are currently temporarily restricting orders to be carried out. Please use the limit order.',
                 '70010': 'We are temporarily raising the minimum order quantity as the system load is now rising.',
             }
-            errorClasses = self.exceptions
-            code = self.safe_string(data, 'code')
-            message = self.safe_string(errorMessages, code, 'Error')
-            ErrorClass = self.safe_value(errorClasses, code)
-            if ErrorClass is not None:
-                raise ErrorClass(message)
-            else:
-                raise ExchangeError(self.id + ' ' + self.json(response))
-        return response
+            codeError = self.safe_string(data, 'code')
+            message = self.safe_string(errorMessages, codeError, 'Error')
+            self.throw_exactly_matched_exception(self.exceptions['exact'], codeError, message)
+            raise ExchangeError(self.id + ' ' + self.json(response))
+        return None

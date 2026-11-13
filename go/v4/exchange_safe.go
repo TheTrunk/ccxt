@@ -1,0 +1,1108 @@
+package ccxt
+
+import (
+	// "errors"
+	"encoding/json"
+	"fmt"
+
+	// "reflect"
+	"strconv"
+	"strings"
+)
+
+func getValueFromList(list any, keys []any, defVal any) any {
+	// a maybe-undefined element travels as a pointer; unwrap it so callers keep
+	// seeing plain scalars (nil pointer -> untyped nil)
+	switch l := list.(type) {
+	case []any:
+		for _, key := range keys {
+			if keyInt, err := strconv.Atoi(fmt.Sprintf("%v", key)); err == nil {
+				if keyInt >= 0 && keyInt < len(l) {
+					return derefScalar(l[keyInt])
+				}
+			}
+		}
+	case []string:
+		for _, key := range keys {
+			if keyInt, err := strconv.Atoi(fmt.Sprintf("%v", key)); err == nil {
+				if keyInt >= 0 && keyInt < len(l) {
+					return derefScalar(l[keyInt])
+				}
+			}
+		}
+	case []int:
+		for _, key := range keys {
+			if keyInt, err := strconv.Atoi(fmt.Sprintf("%v", key)); err == nil {
+				if keyInt >= 0 && keyInt < len(l) {
+					return derefScalar(l[keyInt])
+				}
+			}
+		}
+	case []int32:
+		for _, key := range keys {
+			if keyInt, err := strconv.Atoi(fmt.Sprintf("%v", key)); err == nil {
+				if keyInt >= 0 && keyInt < len(l) {
+					return derefScalar(l[keyInt])
+				}
+			}
+		}
+	case []int64:
+		for _, key := range keys {
+			if keyInt, err := strconv.Atoi(fmt.Sprintf("%v", key)); err == nil {
+				if keyInt >= 0 && keyInt < len(l) {
+					return derefScalar(l[keyInt])
+				}
+			}
+		}
+	case []float64:
+		for _, key := range keys {
+			if keyInt, err := strconv.Atoi(fmt.Sprintf("%v", key)); err == nil {
+				if keyInt >= 0 && keyInt < len(l) {
+					return derefScalar(l[keyInt])
+				}
+			}
+		}
+	}
+	return defVal
+}
+
+func SafeValueN(obj any, keys []any, defaultValue ...any) any {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	// normalize pointer-carried container/keys before any lookup: a typed nil must
+	// read as absent and a non-nil pointer as the value it points at
+	obj = derefScalar(obj)
+	copiedKeys := false
+	for i, key := range keys {
+		switch key.(type) {
+		case *string, *int64, *float64, *bool, *int, *[]string, *[]any, *map[string]any, *any:
+			if !copiedKeys {
+				normKeys := make([]any, len(keys))
+				copy(normKeys, keys)
+				keys = normKeys
+				copiedKeys = true
+			}
+			keys[i] = derefScalar(key)
+		}
+	}
+	if obj == nil {
+		return defVal
+	}
+
+	// Handle maps
+	if dict, ok := obj.(map[string]any); ok {
+		for _, key := range keys {
+			if key == nil {
+				continue
+			}
+			keyStr := fmt.Sprintf("%v", key)
+			if value, found := dict[keyStr]; found {
+				value = derefScalar(value)
+				if value != nil && value != "" {
+					return value
+				}
+			}
+		}
+		return defVal
+	} else if futures, ok := obj.(map[string]*Future); ok {
+		for _, key := range keys {
+			if key == nil {
+				continue
+			}
+			if future, found := futures[fmt.Sprintf("%v", key)]; found && future != nil {
+				return future
+			}
+		}
+		return defVal
+	} else if bookMap, ok := obj.(map[string]map[string]any); ok {
+		// the ohlcv book is two-level: a symbol key answers its timeframe map
+		for _, key := range keys {
+			if key == nil {
+				continue
+			}
+			keyStr := fmt.Sprintf("%v", key)
+			if found, present := bookMap[keyStr]; present {
+				var value any = derefScalar(found)
+				if value != nil {
+					return value
+				}
+			}
+		}
+		return defVal
+	}
+
+	switch v := obj.(type) {
+	// handle slices
+	case []any:
+		return getValueFromList(v, keys, defVal)
+	case ListCache:
+		return getValueFromList([]any(v), keys, defVal)
+	case []string:
+		return getValueFromList(v, keys, defVal)
+	case []int:
+		return getValueFromList(v, keys, defVal)
+	case []int32:
+		return getValueFromList(v, keys, defVal)
+	case []int64:
+		return getValueFromList(v, keys, defVal)
+	case []float64:
+		return getValueFromList(v, keys, defVal)
+	// handle map[strings]
+	case map[string]map[string]any:
+		for _, key := range keys {
+			if key == nil {
+				continue
+			}
+			keyStr := fmt.Sprintf("%v", key)
+			if val, ok := v[keyStr]; ok {
+				return val
+			}
+		}
+		return defVal
+	case map[string]*ArrayCacheByTimestamp:
+		for _, key := range keys {
+			if key == nil {
+				continue
+			}
+			keyStr := fmt.Sprintf("%v", key)
+			if val, ok := v[keyStr]; ok {
+				return val
+			}
+		}
+		return defVal
+	case map[string]*ArrayCache:
+		for _, key := range keys {
+			if key == nil {
+				continue
+			}
+			keyStr := fmt.Sprintf("%v", key)
+			if val, ok := v[keyStr]; ok {
+				return val
+			}
+		}
+		return defVal
+	case map[string]*ArrayCacheBySymbolBySide:
+		for _, key := range keys {
+			if key == nil {
+				continue
+			}
+			keyStr := fmt.Sprintf("%v", key)
+			if val, ok := v[keyStr]; ok {
+				return val
+			}
+		}
+		return defVal
+	// handle cache types
+	case *ArrayCache:
+		if len(keys) > 0 && keys[0] != nil {
+			keyStr := fmt.Sprintf("%v", keys[0])
+			switch keyStr {
+			case "Hashmap", "hashmap":
+				return v.Hashmap
+			case "Data", "data":
+				return v.Data
+			}
+		}
+	case *ArrayCacheByTimestamp:
+		if len(keys) > 0 && keys[0] != nil {
+			keyStr := fmt.Sprintf("%v", keys[0])
+			switch keyStr {
+			case "Hashmap", "hashmap":
+				return v.Hashmap
+			case "Data", "data":
+				return v.Data
+			}
+		}
+	case *ArrayCacheBySymbolById:
+		if len(keys) > 0 && keys[0] != nil {
+			keyStr := fmt.Sprintf("%v", keys[0])
+			switch keyStr {
+			case "Hashmap", "hashmap":
+				return v.Hashmap
+			case "Data", "data":
+				return v.Data
+			}
+		}
+	case *ArrayCacheBySymbolBySide:
+		if len(keys) > 0 && keys[0] != nil {
+			keyStr := fmt.Sprintf("%v", keys[0])
+			switch keyStr {
+			case "Hashmap", "hashmap":
+				return v.Hashmap
+			case "Data", "data":
+				return v.Data
+			}
+		}
+	default:
+		// Handle orderbook interfaces
+		if ob, ok := obj.(OrderBookInterface); ok { // TODO: should takes keys and not keys[0]
+			return ob.GetValue(derefScalar(keys[0]).(string), defVal)
+		}
+		if obs, ok := obj.(IOrderBookSide); ok { // TODO: should takes keys and not keys[0]
+			switch keys[0].(type) {
+			case string:
+				return obs.GetValue(derefScalar(keys[0]).(string), defVal)
+			case int:
+				return obs.GetData()[derefScalar(keys[0]).(int)]
+			}
+		}
+	}
+	return defVal
+}
+
+// SafeStringN retrieves a string value from a nested structure
+func SafeStringN(obj any, keys []any, defaultValue any) any {
+	value := SafeValueN(obj, keys)
+	if value == nil {
+		return defaultValue
+	}
+
+	switch v := value.(type) {
+	case string:
+		return v
+	case int:
+		return strconv.Itoa(v)
+	case int8, int16, int32, int64:
+		return strconv.FormatInt(derefScalar(v).(int64), 10)
+	case uint, uint8, uint16, uint32, uint64:
+		return strconv.FormatUint(v.(uint64), 10)
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32)
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case json.Number:
+		return string(v)
+	default:
+		return defaultValue
+	}
+}
+
+func (this *BaseExchange) SafeStringUpperN(obj any, keys []any, defaultValue ...any) *string {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeStringUpperN(obj, keys, defVal)
+	if v, ok := derefScalar(res).(string); ok {
+		return &v
+	}
+	if defVal != nil {
+		v := ToString(defVal)
+		return &v
+	}
+	return nil
+}
+
+func SafeStringUpperN(obj any, keys []any, defaultValue any) any {
+	value := SafeStringN(obj, keys, nil)
+	if value == nil {
+		return defaultValue
+	}
+	return strings.ToUpper(derefScalar(value).(string))
+}
+
+// SafeFloatN retrieves a float64 value from a nested structure
+func SafeFloatN(obj any, keys []any, defaultValue any) any {
+	value := derefScalar(SafeValueN(obj, keys, defaultValue))
+	if value == nil {
+		return defaultValue
+	}
+
+	switch v := value.(type) {
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	case int:
+		return float64(v)
+	case int32:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case json.Number:
+		if f, err := v.Float64(); err == nil {
+			return f
+		}
+	case string:
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+	default:
+		return defaultValue
+	}
+
+	return defaultValue
+}
+
+// SafeIntegerN retrieves an int64 value from a nested structure
+func SafeIntegerN(obj any, keys []any, defaultValue any) any {
+	value := derefScalar(SafeValueN(obj, keys, defaultValue))
+	if value == nil {
+		return nil
+	}
+
+	switch v := value.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	case float32:
+		return int64(v)
+	case json.Number:
+		if i, err := v.Int64(); err == nil {
+			return i
+		}
+		if f, err := v.Float64(); err == nil {
+			return int64(f)
+		}
+	case string:
+		if i, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return i
+		}
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return int64(f)
+		}
+	default:
+		return defaultValue
+	}
+
+	return defaultValue
+}
+
+// SafeValue retrieves a value from a nested structure
+func SafeValue(obj any, key any, defaultValue any) any {
+	return SafeValueN(obj, []any{key}, defaultValue)
+}
+
+// SafeString retrieves a string value from a nested structure
+func SafeString(obj any, key any, defaultValue any) any {
+	value := derefScalar(SafeValue(obj, key, nil))
+	if value != nil {
+		switch v := value.(type) {
+		case string:
+			return v
+		case int:
+			return strconv.Itoa(v)
+		case int8, int16, int32, int64:
+			return strconv.FormatInt(derefScalar(v).(int64), 10)
+		case uint, uint8, uint16, uint32, uint64:
+			return strconv.FormatUint(v.(uint64), 10)
+		case float32:
+			return strconv.FormatFloat(float64(v), 'f', -1, 32)
+		case float64:
+			return strconv.FormatFloat(v, 'f', -1, 64)
+		case json.Number:
+			return string(v)
+		}
+	}
+	return defaultValue
+}
+
+func SafeString2(obj any, key any, key2 any, defaultValue any) any {
+	val1 := SafeString(obj, key, nil)
+	if val1 != nil {
+		return val1
+	}
+	return SafeString(obj, key2, defaultValue)
+}
+
+// SafeFloat retrieves a float64 value from a nested structure
+func SafeFloat(obj any, key any, defaultValue any) any {
+	return SafeFloatN(obj, []any{key}, defaultValue)
+}
+
+func SafeFloat2(obj any, key any, key2 any, defaultValue any) any {
+	return SafeFloatN(obj, []any{key, key2}, defaultValue)
+}
+
+// SafeInteger retrieves an int64 value from a nested structure
+func SafeInteger(obj any, key any, defaultValue any) any {
+	return SafeIntegerN(obj, []any{key}, defaultValue)
+}
+
+func SafeInt64(obj any, key any, defaultValue any) any {
+	res := SafeInteger(obj, key, defaultValue)
+	if res != nil {
+		return derefScalar(res).(int64)
+	}
+	return nil
+}
+
+func SafeInteger2(obj any, key any, key2 any, defaultValue any) any {
+	return SafeIntegerN(obj, []any{key, key2}, defaultValue)
+}
+
+// SafeTimestampN retrieves a timestamp value from a nested structure
+func SafeTimestampN(obj any, keys []any, defaultValue any) any {
+	result := SafeValueN(obj, keys, defaultValue)
+	if result == nil {
+		return nil
+	}
+
+	if jsonNum, ok := result.(json.Number); ok {
+		if strings.Contains(string(jsonNum), ".") {
+			if f, err := jsonNum.Float64(); err == nil {
+				return int64(f * 1000)
+			}
+		} else {
+			if i, err := jsonNum.Int64(); err == nil {
+				return i * 1000
+			}
+		}
+	}
+
+	if resultStr, ok := result.(string); ok && strings.Contains(resultStr, ".") {
+		if f, err := strconv.ParseFloat(resultStr, 64); err == nil {
+			return int64(f * 1000)
+		}
+	} else if resultFloat, ok := result.(float64); ok && strings.Contains(fmt.Sprintf("%f", resultFloat), ".") {
+		return int64(resultFloat * 1000)
+	}
+	return SafeIntegerN(obj, keys, defaultValue).(int64) * 1000
+}
+
+// SafeTimestamp retrieves a timestamp value from a nested structure
+func SafeTimestamp(obj any, key any, defaultValue any) any {
+	return SafeTimestampN(obj, []any{key}, defaultValue)
+}
+
+// SafeTimestamp2 retrieves a timestamp value from a nested structure with two keys
+func SafeTimestamp2(obj any, key1, key2 any, defaultValue any) any {
+	return SafeTimestampN(obj, []any{key1, key2}, defaultValue)
+}
+
+// SafeIntegerProductN retrieves a multiplied integer value from a nested structure
+func SafeIntegerProductN(obj any, keys []any, multiplier any, defaultValue any) any {
+	if multiplier == nil {
+		multiplier = 1
+	}
+	result := SafeValueN(obj, keys)
+	if result == nil {
+		return defaultValue
+	}
+
+	var resultFloat float64
+	var err error
+
+	if jsonNum, ok := result.(json.Number); ok {
+		resultFloat, err = jsonNum.Float64()
+		if err != nil {
+			return defaultValue
+		}
+	} else {
+		resultFloat, err = strconv.ParseFloat(fmt.Sprintf("%v", result), 64)
+		if err != nil {
+			return defaultValue
+		}
+	}
+
+	multiplierFloat, _ := strconv.ParseFloat(fmt.Sprintf("%v", multiplier), 64)
+
+	return int64(resultFloat * multiplierFloat)
+}
+
+// SafeIntegerProduct retrieves a multiplied integer value from a nested structure
+func SafeIntegerProduct(obj any, key any, multiplier any, defaultValue any) any {
+	return SafeIntegerProductN(obj, []any{key}, multiplier, defaultValue)
+}
+
+// SafeIntegerProduct2 retrieves a multiplied integer value from a nested structure with two keys
+func SafeIntegerProduct2(obj any, key1, key2 any, multiplier any, defaultValue any) any {
+	return SafeIntegerProductN(obj, []any{key1, key2}, multiplier, defaultValue)
+}
+
+// SafeBool retrieves a boolean value from a nested structure
+func SafeBool(obj any, key any, defaultValue any) any {
+	value := derefScalar(SafeValueN(obj, []any{key}, defaultValue))
+	if value == nil {
+		return defaultValue
+	}
+
+	if v, ok := value.(bool); ok {
+		return v
+	}
+
+	return defaultValue
+}
+
+// SafeStringPtr gives a transpiled string-ish accessor the pointer shape the hand-written
+// Safe* layer uses: a string becomes a *string, anything else (including the untyped nil
+// derefScalar produces for an absent value) stays absent as a nil pointer. Used by the
+// coerced SafeCurrencyCode/SafeSymbol signatures (see coerceTypedStringAccessors and
+// coerceTypedStringAccessorOverrides in build/goTranspiler.ts); mirrors how SafeString below
+// unwraps its own result. Exported because an exchange that overrides one of the two
+// accessors lives outside the ccxt package (pro/prediction) and the transpiler qualifies
+// package-level names there.
+func SafeStringPtr(v any) *string {
+	if s, ok := derefScalar(v).(string); ok {
+		return &s
+	}
+	return nil
+}
+
+// SafeBoolPtr is SafeStringPtr's bool twin: a bool becomes a *bool, anything else a nil pointer.
+func SafeBoolPtr(v any) *bool {
+	if b, ok := derefScalar(v).(bool); ok {
+		return &b
+	}
+	return nil
+}
+
+// private wrappers
+
+func (this *BaseExchange) SafeString(obj any, key any, defaultValue ...any) *string {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeString(obj, key, defVal)
+	if v, ok := derefScalar(res).(string); ok {
+		return &v
+	}
+	if defVal != nil {
+		v := ToString(defVal)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeStringUpper(obj any, key any, defaultValue ...any) *string {
+	if res := this.SafeString(obj, key); res != nil {
+		v := strings.ToUpper(*res)
+		return &v
+	}
+	if len(defaultValue) > 0 && derefScalar(defaultValue[0]) != nil {
+		v := ToString(derefScalar(defaultValue[0]))
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeStringLower(obj any, key any, defaultValue ...any) *string {
+	if res := this.SafeString(obj, key); res != nil {
+		v := strings.ToLower(*res)
+		return &v
+	}
+	if len(defaultValue) > 0 && derefScalar(defaultValue[0]) != nil {
+		v := ToString(derefScalar(defaultValue[0]))
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeStringLower2(obj any, key any, key2 any, defaultValue ...any) *string {
+	if res := this.SafeString2(obj, key, key2); res != nil {
+		v := strings.ToLower(*res)
+		return &v
+	}
+	if len(defaultValue) > 0 && derefScalar(defaultValue[0]) != nil {
+		v := ToString(derefScalar(defaultValue[0]))
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeStringUpper2(obj any, key any, key2 any, defaultValue ...any) *string {
+	if res := this.SafeString2(obj, key, key2); res != nil {
+		v := strings.ToUpper(*res)
+		return &v
+	}
+	if len(defaultValue) > 0 && derefScalar(defaultValue[0]) != nil {
+		v := ToString(derefScalar(defaultValue[0]))
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeString2(obj any, key any, key2 any, defaultValue ...any) *string {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeString2(obj, key, key2, defVal)
+	if v, ok := derefScalar(res).(string); ok {
+		return &v
+	}
+	if defVal != nil {
+		v := ToString(defVal)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeStringN(obj any, keys2 any, defaultValue ...any) *string {
+	keys := keys2.([]any)
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeStringN(obj, keys, defVal)
+	if v, ok := derefScalar(res).(string); ok {
+		return &v
+	}
+	if defVal != nil {
+		v := ToString(defVal)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeStringLowerN(obj any, keys []any, defaultValue ...any) *string {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeStringLowerN(obj, keys, defVal)
+	if v, ok := derefScalar(res).(string); ok {
+		return &v
+	}
+	if defVal != nil {
+		v := ToString(defVal)
+		return &v
+	}
+	return nil
+}
+
+func SafeStringLowerN(obj any, keys []any, defaultValue any) any {
+	value := SafeStringN(obj, keys, nil)
+	if value == nil {
+		return defaultValue
+	}
+	return strings.ToLower(derefScalar(value).(string))
+}
+
+func (this *BaseExchange) SafeFloat(obj any, key any, defaultValue ...any) *float64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeFloat(obj, key, defVal)
+	if v, ok := derefScalar(res).(float64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case float64:
+		return &d
+	case int64:
+		v := float64(d)
+		return &v
+	case int:
+		v := float64(d)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeFloat2(obj any, key any, key2 any, defaultValue ...any) *float64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeFloat2(obj, key, key2, defVal)
+	if v, ok := derefScalar(res).(float64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case float64:
+		return &d
+	case int64:
+		v := float64(d)
+		return &v
+	case int:
+		v := float64(d)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeFloatN(obj any, keys []any, defaultValue ...any) *float64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeFloatN(obj, keys, defVal)
+	if v, ok := derefScalar(res).(float64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case float64:
+		return &d
+	case int64:
+		v := float64(d)
+		return &v
+	case int:
+		v := float64(d)
+		return &v
+	}
+	return nil
+}
+
+// toFloat64Ptr boxes the value a numeric helper handed back as `any` into the *float64
+// shape the Safe*Number accessors return: an absent value (untyped or typed nil) stays
+// nil, any Go numeric becomes a float64 pointer — the Go encoding of the TS `number`,
+// matching what the hand-written SafeFloat layer does with a default value.
+func toFloat64Ptr(v any) *float64 {
+	switch n := derefScalar(v).(type) {
+	case float64:
+		return &n
+	case int64:
+		f := float64(n)
+		return &f
+	case int:
+		f := float64(n)
+		return &f
+	}
+	return nil
+}
+
+// SafeNumber / SafeNumber2 / SafeNumberN / SafeNumberOmitZero mirror the TS safeNumber*
+// methods. They are TS methods, so the printer emits them into exchange_generated.go —
+// with an `any` return, because the `Num` annotation is a nullable alias. The transpiled
+// copies are dropped (build/goTranspiler.ts) in favour of these: the same bodies, with
+// the honest *float64 the other ports carry, so their locals can be typed
+// (build/go-local-types.js) — nil pointer = absent, present zero = non-nil pointer.
+
+func (this *BaseExchange) SafeNumber(obj any, key any, defaultValue ...any) *float64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	var value *string = this.SafeString(obj, key)
+	return this.ParseNumber(value, defVal)
+}
+
+func (this *BaseExchange) SafeNumber2(obj any, key1 any, key2 any, defaultValue ...any) *float64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	var value *string = this.SafeString2(obj, key1, key2)
+	return this.ParseNumber(value, defVal)
+}
+
+func (this *BaseExchange) SafeNumberN(obj any, keys any, defaultValue ...any) *float64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	var value *string = this.SafeStringN(obj, keys)
+	return this.ParseNumber(value, defVal)
+}
+
+func (this *BaseExchange) SafeNumberOmitZero(obj any, key any, defaultValue ...any) *float64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	var value *string = this.SafeString(obj, key)
+	var final *float64 = this.ParseNumber(this.OmitZero(value))
+	if final == nil {
+		return toFloat64Ptr(defVal)
+	}
+	return final
+}
+
+func (this *BaseExchange) SafeInteger(obj any, key any, defaultValue ...any) *int64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeInteger(obj, key, defVal)
+	if v, ok := derefScalar(res).(int64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case int64:
+		return &d
+	case int:
+		v := int64(d)
+		return &v
+	case float64:
+		v := int64(d)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeInteger2(obj any, key any, key2 any, defaultValue ...any) *int64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeInteger2(obj, key, key2, defVal)
+	if v, ok := derefScalar(res).(int64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case int64:
+		return &d
+	case int:
+		v := int64(d)
+		return &v
+	case float64:
+		v := int64(d)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeIntegerN(obj any, keys []any, defaultValue ...any) *int64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeIntegerN(obj, keys, defVal)
+	if v, ok := derefScalar(res).(int64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case int64:
+		return &d
+	case int:
+		v := int64(d)
+		return &v
+	case float64:
+		v := int64(d)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeValue(obj any, key any, defaultValue ...any) any {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	return SafeValue(obj, key, defVal)
+}
+
+func (this *BaseExchange) SafeValue2(obj any, key any, key2 any, defaultValue ...any) any {
+	return SafeValueN(obj, []any{key, key2}, defaultValue...)
+}
+
+func (this *BaseExchange) SafeValueN(obj any, keys any, defaultValue ...any) any {
+	keysArray := keys.([]any)
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	return SafeValueN(obj, keysArray, defVal)
+}
+
+// SafeBool / SafeBool2 / SafeBoolN. Unlike the rest of the Safe* pointer layer, whose TS
+// bodies are imported free functions, TS declares these three as methods, so the printer emits
+// `any` copies into exchange_generated.go. build/goTranspiler.ts drops that copy (see the
+// SafeBool entry in its base-methods regexAll) and these hand-written twins stand in, with the
+// same contract as TS: a stored non-bool falls back to a bool default, so a bool default never
+// yields nil; nil means absent with no bool default; a present false is a pointer to false; the
+// value read back through a caller-facing shim is unchanged because every shim derefs at entry.
+func (this *BaseExchange) SafeBool(obj any, key any, defaultValue ...any) *bool {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := this.SafeValue(obj, key, defVal)
+	if v, ok := derefScalar(res).(bool); ok {
+		return &v
+	}
+	if d, ok := defVal.(bool); ok {
+		return &d
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeBool2(obj any, key any, key2 any, defaultValue ...any) *bool {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := this.SafeValue(obj, key)
+	if v, ok := derefScalar(res).(bool); ok {
+		return &v
+	}
+	res = this.SafeValue(obj, key2, defVal)
+	if v, ok := derefScalar(res).(bool); ok {
+		return &v
+	}
+	if d, ok := defVal.(bool); ok {
+		return &d
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeBoolN(obj any, keys any, defaultValue ...any) *bool {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := this.SafeValueN(obj, keys, defVal)
+	if v, ok := derefScalar(res).(bool); ok {
+		return &v
+	}
+	if d, ok := defVal.(bool); ok {
+		return &d
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeTimestamp(obj any, key any, defaultValue ...any) *int64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeTimestamp(obj, key, defVal)
+	if v, ok := derefScalar(res).(int64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case int64:
+		return &d
+	case int:
+		v := int64(d)
+		return &v
+	case float64:
+		v := int64(d)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeTimestamp2(obj any, key1, key2 any, defaultValue ...any) *int64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeTimestamp2(obj, key1, key2, defVal)
+	if v, ok := derefScalar(res).(int64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case int64:
+		return &d
+	case int:
+		v := int64(d)
+		return &v
+	case float64:
+		v := int64(d)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeTimestampN(obj any, keys []any, defaultValue ...any) *int64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeTimestampN(obj, keys, defVal)
+	if v, ok := derefScalar(res).(int64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case int64:
+		return &d
+	case int:
+		v := int64(d)
+		return &v
+	case float64:
+		v := int64(d)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeIntegerProduct(obj any, key any, multiplier any, defaultValue ...any) *int64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeIntegerProduct(obj, key, multiplier, defVal)
+	if v, ok := derefScalar(res).(int64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case int64:
+		return &d
+	case int:
+		v := int64(d)
+		return &v
+	case float64:
+		v := int64(d)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeIntegerProduct2(obj any, key1, key2 any, multiplier any, defaultValue ...any) *int64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeIntegerProduct2(obj, key1, key2, multiplier, defVal)
+	if v, ok := derefScalar(res).(int64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case int64:
+		return &d
+	case int:
+		v := int64(d)
+		return &v
+	case float64:
+		v := int64(d)
+		return &v
+	}
+	return nil
+}
+
+func (this *BaseExchange) SafeIntegerProductN(obj any, keys []any, multiplier any, defaultValue ...any) *int64 {
+	var defVal any = nil
+	if len(defaultValue) > 0 {
+		defVal = derefScalar(defaultValue[0])
+	}
+	res := SafeIntegerProductN(obj, keys, multiplier, defVal)
+	if v, ok := derefScalar(res).(int64); ok {
+		return &v
+	}
+	switch d := derefScalar(defVal).(type) {
+	case int64:
+		return &d
+	case int:
+		v := int64(d)
+		return &v
+	case float64:
+		v := int64(d)
+		return &v
+	}
+	return nil
+}
+
+// func (this *BaseExchange) safeBool(obj any, key any, defaultValue ...bool) bool {
+// 	defVal := false
+// 	if len(defaultValue) > 0 {
+// 		defVal = defaultValue[0]
+// 	}
+// 	return SafeBool(obj, key, defVal)
+// }
+
+// func (this *BaseExchange) safeBool(obj any, key any, defaultValue bool) bool {
+// 	return SafeBool(obj, key, defaultValue)
+// }
+
+// SafeDictMap, SafeDict2Map and SafeDictNMap are SafeDict* read as map[string]any
+// (absent, or a non-map value/default, is a nil map).
+func (this *BaseExchange) SafeDictMap(dictionaryOrList any, key any, optionalArgs ...any) map[string]any {
+	return MapTyped(this.SafeDict(dictionaryOrList, key, optionalArgs...))
+}
+
+func (this *BaseExchange) SafeDict2Map(dictionaryOrList any, key1 any, key2 any, optionalArgs ...any) map[string]any {
+	return MapTyped(this.SafeDict2(dictionaryOrList, key1, key2, optionalArgs...))
+}
+
+func (this *BaseExchange) SafeDictNMap(dictionaryOrList any, keys any, optionalArgs ...any) map[string]any {
+	return MapTyped(this.SafeDictN(dictionaryOrList, keys, optionalArgs...))
+}

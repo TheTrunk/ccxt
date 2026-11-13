@@ -4,14 +4,11 @@
 # https://github.com/ccxt/ccxt/blob/master/CONTRIBUTING.md#how-to-contribute-code
 
 from ccxt.async_support.base.exchange import Exchange
-
-# -----------------------------------------------------------------------------
-
-try:
-    basestring  # Python 3
-except NameError:
-    basestring = str  # Python 2
+from ccxt.abstract.btcbox import ImplicitAPI
+import asyncio
+import hashlib
 import json
+from ccxt.base.types import Balances, Int, Market, Num, Order, OrderBook, OrderSide, OrderType, Str, Strings, Ticker, Tickers, Trade
 from ccxt.base.errors import ExchangeError
 from ccxt.base.errors import AuthenticationError
 from ccxt.base.errors import PermissionDenied
@@ -20,56 +17,216 @@ from ccxt.base.errors import InvalidOrder
 from ccxt.base.errors import OrderNotFound
 from ccxt.base.errors import DDoSProtection
 from ccxt.base.errors import InvalidNonce
+from ccxt.base.decimal_to_precision import TICK_SIZE
+from ccxt.base.precise import Precise
 
 
-class btcbox(Exchange):
+class btcbox(Exchange, ImplicitAPI):
 
-    def describe(self):
+    def describe(self) -> dict:
         return self.deep_extend(super(btcbox, self).describe(), {
             'id': 'btcbox',
             'name': 'BtcBox',
             'countries': ['JP'],
             'rateLimit': 1000,
             'version': 'v1',
+            'pro': False,
             'has': {
-                'CORS': False,
-                'fetchOrder': True,
-                'fetchOrders': True,
+                'CORS': None,
+                'spot': True,
+                'margin': False,
+                'swap': False,
+                'future': False,
+                'option': False,
+                'addMargin': False,
+                'borrowCrossMargin': False,
+                'borrowIsolatedMargin': False,
+                'borrowMargin': False,
+                'cancelOrder': True,
+                'closeAllPositions': False,
+                'closePosition': False,
+                'createOrder': True,
+                'createOrderWithTakeProfitAndStopLoss': False,
+                'createOrderWithTakeProfitAndStopLossWs': False,
+                'createPostOnlyOrder': False,
+                'createReduceOnlyOrder': False,
+                'fetchBalance': True,
+                'fetchBorrowInterest': False,
+                'fetchBorrowRate': False,
+                'fetchBorrowRateHistories': False,
+                'fetchBorrowRateHistory': False,
+                'fetchBorrowRates': False,
+                'fetchBorrowRatesPerSymbol': False,
+                'fetchCrossBorrowRate': False,
+                'fetchCrossBorrowRates': False,
+                'fetchCurrencies': False,
+                'fetchFundingHistory': False,
+                'fetchFundingInterval': False,
+                'fetchFundingIntervals': False,
+                'fetchFundingRate': False,
+                'fetchFundingRateHistory': False,
+                'fetchFundingRates': False,
+                'fetchGreeks': False,
+                'fetchIndexOHLCV': False,
+                'fetchIsolatedBorrowRate': False,
+                'fetchIsolatedBorrowRates': False,
+                'fetchIsolatedPositions': False,
+                'fetchLeverage': False,
+                'fetchLeverages': False,
+                'fetchLeverageTiers': False,
+                'fetchLiquidations': False,
+                'fetchLongShortRatio': False,
+                'fetchLongShortRatioHistory': False,
+                'fetchMarginAdjustmentHistory': False,
+                'fetchMarginMode': False,
+                'fetchMarginModes': False,
+                'fetchMarketLeverageTiers': False,
+                'fetchMarkets': True,
+                'fetchMarkOHLCV': False,
+                'fetchMarkPrices': False,
+                'fetchMyLiquidations': False,
+                'fetchMySettlementHistory': False,
+                'fetchOpenInterest': False,
+                'fetchOpenInterestHistory': False,
+                'fetchOpenInterests': False,
                 'fetchOpenOrders': True,
-                'fetchTickers': False,
+                'fetchOption': False,
+                'fetchOptionChain': False,
+                'fetchOrder': True,
+                'fetchOrderBook': True,
+                'fetchOrders': True,
+                'fetchPosition': False,
+                'fetchPositionHistory': False,
+                'fetchPositionMode': False,
+                'fetchPositions': False,
+                'fetchPositionsForSymbol': False,
+                'fetchPositionsHistory': False,
+                'fetchPositionsRisk': False,
+                'fetchPremiumIndexOHLCV': False,
+                'fetchSettlementHistory': False,
+                'fetchTicker': True,
+                'fetchTickers': True,
+                'fetchTrades': True,
+                'fetchTransfer': False,
+                'fetchTransfers': False,
+                'fetchVolatilityHistory': False,
+                'fetchWithdrawal': False,
+                'fetchWithdrawals': False,
+                'reduceMargin': False,
+                'repayCrossMargin': False,
+                'repayIsolatedMargin': False,
+                'repayMargin': False,
+                'setLeverage': False,
+                'setMargin': False,
+                'setMarginMode': False,
+                'setPositionMode': False,
+                'transfer': False,
+                'withdraw': False,
+                'ws': False,
             },
             'urls': {
-                'logo': 'https://user-images.githubusercontent.com/1294454/31275803-4df755a8-aaa1-11e7-9abb-11ec2fad9f2d.jpg',
-                'api': 'https://www.btcbox.co.jp/api',
+                'logo': 'https://github.com/user-attachments/assets/1e2cb499-8d0f-4f8f-9464-3c015cfbc76b',
+                'api': {
+                    'rest': 'https://www.btcbox.co.jp/api',
+                },
                 'www': 'https://www.btcbox.co.jp/',
-                'doc': 'https://www.btcbox.co.jp/help/asm',
+                'doc': 'https://blog.btcbox.jp/en/archives/8762',
                 'fees': 'https://support.btcbox.co.jp/hc/en-us/articles/360001235694-Fees-introduction',
             },
             'api': {
                 'public': {
-                    'get': [
-                        'depth',
-                        'orders',
-                        'ticker',
-                    ],
+                    'get': {
+                        'depth': {'cost': 1},
+                        'orders': {'cost': 1},
+                        'ticker': {'cost': 1},
+                        'tickers': {'cost': 1},
+                    },
                 },
                 'private': {
-                    'post': [
-                        'balance',
-                        'trade_add',
-                        'trade_cancel',
-                        'trade_list',
-                        'trade_view',
-                        'wallet',
-                    ],
+                    'post': {
+                        'balance': {'cost': 1},
+                        'order_history': {'cost': 1},
+                        'trade_add': {'cost': 1},
+                        'trade_cancel': {'cost': 1},
+                        'trade_list': {'cost': 1},
+                        'trade_view': {'cost': 1},
+                        'wallet': {'cost': 1},
+                    },
+                },
+                'webApi': {
+                    'get': {
+                        'ajax/coin/coinInfo': {'cost': 1},
+                    },
                 },
             },
-            'markets': {
-                'BTC/JPY': {'id': 'btc', 'symbol': 'BTC/JPY', 'base': 'BTC', 'quote': 'JPY', 'baseId': 'btc', 'quoteId': 'jpy', 'taker': 0.05 / 100, 'maker': 0.05 / 100},
-                'ETH/JPY': {'id': 'eth', 'symbol': 'ETH/JPY', 'base': 'ETH', 'quote': 'JPY', 'baseId': 'eth', 'quoteId': 'jpy', 'taker': 0.10 / 100, 'maker': 0.10 / 100},
-                'LTC/JPY': {'id': 'ltc', 'symbol': 'LTC/JPY', 'base': 'LTC', 'quote': 'JPY', 'baseId': 'ltc', 'quoteId': 'jpy', 'taker': 0.10 / 100, 'maker': 0.10 / 100},
-                'BCH/JPY': {'id': 'bch', 'symbol': 'BCH/JPY', 'base': 'BCH', 'quote': 'JPY', 'baseId': 'bch', 'quoteId': 'jpy', 'taker': 0.10 / 100, 'maker': 0.10 / 100},
+            'options': {
+                'fetchMarkets': {
+                    'webApiEnable': True,  # fetches from WEB
+                    'webApiRetries': 3,
+                },
             },
+            'features': {
+                'spot': {
+                    'sandbox': False,
+                    'createOrder': {
+                        'marginMode': False,
+                        'triggerPrice': False,
+                        'triggerPriceType': None,
+                        'triggerDirection': False,
+                        'stopLossPrice': False,
+                        'takeProfitPrice': False,
+                        'attachedStopLossTakeProfit': None,
+                        'timeInForce': {
+                            'IOC': False,
+                            'FOK': False,
+                            'PO': False,
+                            'GTD': False,
+                        },
+                        'hedged': False,
+                        'leverage': False,
+                        'marketBuyRequiresPrice': False,
+                        'marketBuyByCost': False,
+                        'selfTradePrevention': False,
+                        'trailing': False,
+                        'iceberg': False,
+                    },
+                    'createOrders': None,
+                    'fetchMyTrades': None,
+                    'fetchOrder': {
+                        'marginMode': False,
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': True,
+                    },
+                    'fetchOpenOrders': {
+                        'marginMode': False,
+                        'limit': 100,
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': True,
+                    },
+                    'fetchOrders': {
+                        'marginMode': False,
+                        'limit': 100,
+                        'daysBack': None,
+                        'untilDays': None,
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': True,
+                    },
+                    'fetchClosedOrders': None,
+                    'fetchOHLCV': None,
+                },
+                'swap': {
+                    'linear': None,
+                    'inverse': None,
+                },
+                'future': {
+                    'linear': None,
+                    'inverse': None,
+                },
+            },
+            'precisionMode': TICK_SIZE,
             'exceptions': {
                 '104': AuthenticationError,
                 '105': PermissionDenied,
@@ -84,49 +241,207 @@ class btcbox(Exchange):
             },
         })
 
-    async def fetch_balance(self, params={}):
-        await self.load_markets()
-        response = await self.privatePostBalance(params)
+    async def fetch_markets(self, params: dict = {}) -> list[Market]:
+        """
+        retrieves data on all markets for ace
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict[]: an array of objects representing market data
+        """
+        promise1 = self.publicGetTickers()
+        promise2 = self.fetch_web_endpoint('fetchMarkets', 'webApiGetAjaxCoinCoinInfo', True)
+        response1, response2 = await asyncio.gather(*[promise1, promise2])
+        #
+        result2Data = self.safe_dict(response2, 'data', {})
+        marketIds = list(response1.keys())
+        markets = []
+        for i in range(0, len(marketIds)):
+            marketId = marketIds[i]
+            symbolParts = marketId.split('_')
+            baseCurr = self.safe_string(symbolParts, 0, '')
+            quote = self.safe_string(symbolParts, 1, '')
+            quoteId = quote.lower()
+            id = baseCurr.lower()
+            res = self.safe_dict(response1, marketId, {})
+            symbol = baseCurr + '/' + quote
+            fee = self.parse_number('0.0005') if (id == 'BTC') else self.parse_number('0.0010')
+            details = self.safe_dict(result2Data, id, {})
+            tradeDetails = self.safe_dict(details, 'trade', {})
+            markets.append(self.safe_market_structure({
+                'id': id,
+                'uppercaseId': None,
+                'symbol': symbol,
+                'base': baseCurr,
+                'baseId': id,
+                'quote': quote,
+                'quoteId': quoteId,
+                'settle': None,
+                'settleId': None,
+                'type': 'spot',
+                'spot': True,
+                'margin': False,
+                'swap': False,
+                'future': False,
+                'option': False,
+                'taker': fee,
+                'maker': fee,
+                'contract': False,
+                'linear': None,
+                'inverse': None,
+                'contractSize': None,
+                'expiry': None,
+                'expiryDatetime': None,
+                'strike': None,
+                'optionType': None,
+                'limits': {
+                    'amount': {
+                        'min': None,
+                        'max': None,
+                    },
+                    'price': {
+                        'min': None,
+                        'max': None,
+                    },
+                    'cost': {
+                        'min': None,
+                        'max': None,
+                    },
+                    'leverage': {
+                        'min': None,
+                        'max': None,
+                    },
+                },
+                'precision': {
+                    'price': self.parse_number(self.parse_precision(self.safe_string(tradeDetails, 'pricedecimal'))),
+                    'amount': None,
+                },
+                'active': self.safe_string(tradeDetails, 'enable') == '1',
+                'created': None,
+                'info': res,
+            }))
+        return markets
+
+    def parse_market(self, market: dict) -> Market:
+        baseId = self.safe_string(market, 'base')
+        base = self.safe_currency_code(baseId)
+        quoteId = self.safe_string(market, 'quote')
+        quote = self.safe_currency_code(quoteId)
+        if (base is None) or (quote is None):
+            return None
+        symbol = base + '/' + quote
+        return self.safe_market_structure({
+            'id': self.safe_string(market, 'symbol'),
+            'uppercaseId': None,
+            'symbol': symbol,
+            'base': base,
+            'baseId': baseId,
+            'quote': quote,
+            'quoteId': quoteId,
+            'settle': None,
+            'settleId': None,
+            'type': 'spot',
+            'spot': True,
+            'margin': False,
+            'swap': False,
+            'future': False,
+            'option': False,
+            'contract': False,
+            'linear': None,
+            'inverse': None,
+            'contractSize': None,
+            'expiry': None,
+            'expiryDatetime': None,
+            'strike': None,
+            'optionType': None,
+            'limits': {
+                'amount': {
+                    'min': self.safe_number(market, 'minLimitBaseAmount'),
+                    'max': self.safe_number(market, 'maxLimitBaseAmount'),
+                },
+                'price': {
+                    'min': None,
+                    'max': None,
+                },
+                'cost': {
+                    'min': None,
+                    'max': None,
+                },
+                'leverage': {
+                    'min': None,
+                    'max': None,
+                },
+            },
+            'precision': {
+                'price': self.parse_number(self.parse_precision(self.safe_string(market, 'quotePrecision'))),
+                'amount': self.parse_number(self.parse_precision(self.safe_string(market, 'basePrecision'))),
+            },
+            'active': None,
+            'created': None,
+            'info': market,
+        })
+
+    def parse_balance(self, response: dict) -> Balances:
         result = {'info': response}
         codes = list(self.currencies.keys())
         for i in range(0, len(codes)):
             code = codes[i]
             currency = self.currency(code)
-            currencyId = currency['id']
+            currencyId = self.safe_string(currency, 'id', '')
             free = currencyId + '_balance'
             if free in response:
                 account = self.account()
                 used = currencyId + '_lock'
-                account['free'] = self.safe_float(response, free)
-                account['used'] = self.safe_float(response, used)
+                account['free'] = self.safe_string(response, free)
+                account['used'] = self.safe_string(response, used)
                 result[code] = account
-        return self.parse_balance(result)
+        return self.safe_balance(result)
 
-    async def fetch_order_book(self, symbol, limit=None, params={}):
-        await self.load_markets()
+    async def fetch_balance(self, params: dict = {}) -> Balances:
+        """
+        query for balance and get the amount of funds available for trading or funds locked in orders
+
+        https://blog.btcbox.jp/en/archives/8762#toc13
+
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a `balance structure <https://docs.ccxt.com/?id=balance-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
+        response = await self.privatePostBalance(params)
+        return self.parse_balance(response)
+
+    async def fetch_order_book(self, symbol: str, limit: Int = None, params: dict = {}) -> OrderBook:
+        """
+        fetches information on open orders with bid(buy) and ask(sell) prices, volumes and other data
+
+        https://blog.btcbox.jp/en/archives/8762#toc6
+
+        :param str symbol: unified symbol of the market to fetch the order book for
+        :param int [limit]: the maximum amount of order book entries to return
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `order book structure <https://docs.ccxt.com/?id=order-book-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         market = self.market(symbol)
         request = {}
         numSymbols = len(self.symbols)
         if numSymbols > 1:
             request['coin'] = market['baseId']
         response = await self.publicGetDepth(self.extend(request, params))
-        return self.parse_order_book(response)
+        return self.parse_order_book(response, market['symbol'])
 
-    def parse_ticker(self, ticker, market=None):
-        timestamp = self.milliseconds()
-        symbol = None
-        if market is not None:
-            symbol = market['symbol']
-        last = self.safe_float(ticker, 'last')
-        return {
+    def parse_ticker(self, ticker: dict, market: Market = None) -> Ticker:
+        symbol = self.safe_symbol(None, market)
+        last = self.safe_string(ticker, 'last')
+        return self.safe_ticker({
             'symbol': symbol,
-            'timestamp': timestamp,
-            'datetime': self.iso8601(timestamp),
-            'high': self.safe_float(ticker, 'high'),
-            'low': self.safe_float(ticker, 'low'),
-            'bid': self.safe_float(ticker, 'buy'),
+            'timestamp': None,
+            'datetime': None,
+            'high': self.safe_string(ticker, 'high'),
+            'low': self.safe_string(ticker, 'low'),
+            'bid': self.safe_string(ticker, 'buy'),
             'bidVolume': None,
-            'ask': self.safe_float(ticker, 'sell'),
+            'ask': self.safe_string(ticker, 'sell'),
             'askVolume': None,
             'vwap': None,
             'open': None,
@@ -136,13 +451,23 @@ class btcbox(Exchange):
             'change': None,
             'percentage': None,
             'average': None,
-            'baseVolume': self.safe_float(ticker, 'vol'),
-            'quoteVolume': self.safe_float(ticker, 'volume'),
+            'baseVolume': self.safe_string(ticker, 'vol'),
+            'quoteVolume': self.safe_string(ticker, 'volume'),
             'info': ticker,
-        }
+        }, market)
 
-    async def fetch_ticker(self, symbol, params={}):
-        await self.load_markets()
+    async def fetch_ticker(self, symbol: str, params: dict = {}) -> Ticker:
+        """
+        fetches a price ticker, a statistical calculation with the information calculated over the past 24 hours for a specific market
+
+        https://blog.btcbox.jp/en/archives/8762#toc5
+
+        :param str symbol: unified symbol of the market to fetch the ticker for
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a `ticker structure <https://docs.ccxt.com/?id=ticker-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         market = self.market(symbol)
         request = {}
         numSymbols = len(self.symbols)
@@ -151,48 +476,102 @@ class btcbox(Exchange):
         response = await self.publicGetTicker(self.extend(request, params))
         return self.parse_ticker(response, market)
 
-    def parse_trade(self, trade, market=None):
+    async def fetch_tickers(self, symbols: Strings = None, params: dict = {}) -> Tickers:
+        """
+        fetches price tickers for multiple markets, statistical information calculated over the past 24 hours for each market
+        :param str[] [symbols]: unified symbols of the markets to fetch the ticker for, all market tickers are returned if not assigned
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a dictionary of `ticker structures <https://docs.ccxt.com/?id=ticker-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
+        response = await self.publicGetTickers(params)
+        return self.parse_tickers(response, symbols)
+
+    def parse_trade(self, trade: dict, market: Market = None) -> Trade:
+        #
+        # fetchTrades (public)
+        #
+        #      {
+        #          "date":"0",
+        #          "price":4,
+        #          "amount":0.1,
+        #          "tid":"1",
+        #          "type":"buy"
+        #      }
+        #
         timestamp = self.safe_timestamp(trade, 'date')
-        symbol = None
-        if market is not None:
-            symbol = market['symbol']
+        marketResolved = self.safe_market(None, market)
         id = self.safe_string(trade, 'tid')
-        price = self.safe_float(trade, 'price')
-        amount = self.safe_float(trade, 'amount')
-        cost = None
-        if amount is not None:
-            if price is not None:
-                cost = price * amount
+        priceString = self.safe_string(trade, 'price')
+        amountString = self.safe_string(trade, 'amount')
         type = None
         side = self.safe_string(trade, 'type')
-        return {
+        return self.safe_trade({
             'info': trade,
             'id': id,
             'order': None,
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
-            'symbol': symbol,
+            'symbol': marketResolved['symbol'],
             'type': type,
             'side': side,
             'takerOrMaker': None,
-            'price': price,
-            'amount': amount,
-            'cost': cost,
+            'price': priceString,
+            'amount': amountString,
+            'cost': None,
             'fee': None,
-        }
+        }, marketResolved)
 
-    async def fetch_trades(self, symbol, since=None, limit=None, params={}):
-        await self.load_markets()
+    async def fetch_trades(self, symbol: str, since: Int = None, limit: Int = None, params: dict = {}) -> list[Trade]:
+        """
+        get the list of most recent trades for a particular symbol
+
+        https://blog.btcbox.jp/en/archives/8762#toc7
+
+        :param str symbol: unified symbol of the market to fetch trades for
+        :param int [since]: timestamp in ms of the earliest trade to fetch
+        :param int [limit]: the maximum amount of trades to fetch
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Trade[]: a list of `trade structures <https://docs.ccxt.com/?id=public-trades>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         market = self.market(symbol)
         request = {}
         numSymbols = len(self.symbols)
         if numSymbols > 1:
             request['coin'] = market['baseId']
         response = await self.publicGetOrders(self.extend(request, params))
+        #
+        #     [
+        #          {
+        #              "date":"0",
+        #              "price":3,
+        #              "amount":0.1,
+        #              "tid":"1",
+        #              "type":"buy"
+        #          },
+        #     ]
+        #
         return self.parse_trades(response, market, since, limit)
 
-    async def create_order(self, symbol, type, side, amount, price=None, params={}):
-        await self.load_markets()
+    async def create_order(self, symbol: str, type: OrderType, side: OrderSide, amount: float, price: Num = None, params: dict = {}) -> Order:
+        """
+        create a trade order
+
+        https://blog.btcbox.jp/en/archives/8762#toc18
+
+        :param str symbol: unified symbol of the market to create an order in
+        :param str type: 'market' or 'limit'
+        :param str side: 'buy' or 'sell'
+        :param float amount: how much of currency you want to trade in units of base currency
+        :param float [price]: the price at which the order is to be fulfilled, in units of the quote currency, ignored in market orders
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         market = self.market(symbol)
         request = {
             'amount': amount,
@@ -204,17 +583,27 @@ class btcbox(Exchange):
         #
         #     {
         #         "result":true,
-        #         "id":"11"
+        #         "id":"12"
         #     }
         #
         return self.parse_order(response, market)
 
-    async def cancel_order(self, id, symbol=None, params={}):
-        await self.load_markets()
+    async def cancel_order(self, id: str, symbol: Str = None, params: dict = {}) -> Order:
+        """
+        cancels an open order
+
+        https://blog.btcbox.jp/en/archives/8762#toc17
+
+        :param str id: order id
+        :param str symbol: unified symbol of the market the order was made in
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: An `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         # a special case for btcbox – default symbol is BTC/JPY
-        if symbol is None:
-            symbol = 'BTC/JPY'
-        market = self.market(symbol)
+        symbolResolved = 'BTC/JPY' if (symbol is None) else symbol
+        market = self.market(symbolResolved)
         request = {
             'id': id,
             'coin': market['baseId'],
@@ -225,7 +614,7 @@ class btcbox(Exchange):
         #
         return self.parse_order(response, market)
 
-    def parse_order_status(self, status):
+    def parse_order_status(self, status: Str) -> Str:
         statuses = {
             # TODO: complete list
             'part': 'open',  # partially or not at all executed
@@ -234,49 +623,41 @@ class btcbox(Exchange):
             'closed': 'closed',  # never encountered, seems to be bug in the doc
             'no': 'closed',  # not clarified in the docs...
         }
+        if status is None:
+            return None
         return self.safe_string(statuses, status, status)
 
-    def parse_order(self, order, market=None):
+    def parse_order(self, order: dict, market: Market = None) -> Order:
         #
         #     {
         #         "id":11,
-        #         "datetime":"2014-10-21 10:47:20",
+        #         "datetime":"2014-10-21 10:47:21",
         #         "type":"sell",
         #         "price":42000,
         #         "amount_original":1.2,
         #         "amount_outstanding":1.2,
         #         "status":"closed",
-        #         "trades":[]
+        #         "trades":[] // no clarification of trade value structure of order endpoint
         #     }
         #
         id = self.safe_string(order, 'id')
         datetimeString = self.safe_string(order, 'datetime')
         timestamp = None
         if datetimeString is not None:
-            timestamp = self.parse8601(order['datetime'] + '+09:00')  # Tokyo time
-        amount = self.safe_float(order, 'amount_original')
-        remaining = self.safe_float(order, 'amount_outstanding')
-        filled = None
-        if amount is not None:
-            if remaining is not None:
-                filled = amount - remaining
-        price = self.safe_float(order, 'price')
-        cost = None
-        if price is not None:
-            if filled is not None:
-                cost = filled * price
+            timestamp = self.parse8601(datetimeString + '+09:00')  # Tokyo time
+        amount = self.safe_string(order, 'amount_original')
+        remaining = self.safe_string(order, 'amount_outstanding')
+        price = self.safe_string(order, 'price')
         # status is set by fetchOrder method only
         status = self.parse_order_status(self.safe_string(order, 'status'))
         # fetchOrders do not return status, use heuristic
         if status is None:
-            if remaining is not None and remaining == 0:
+            if Precise.string_equals(remaining, '0'):
                 status = 'closed'
-        trades = None  # todo: self.parse_trades(order['trades'])
-        symbol = None
-        if market is not None:
-            symbol = market['symbol']
+        trades = None  # todo: this.parseTrades (order['trades']);
+        marketResolved = self.safe_market(None, market)
         side = self.safe_string(order, 'type')
-        return {
+        return self.safe_order({
             'id': id,
             'clientOrderId': None,
             'timestamp': timestamp,
@@ -284,101 +665,166 @@ class btcbox(Exchange):
             'lastTradeTimestamp': None,
             'amount': amount,
             'remaining': remaining,
-            'filled': filled,
+            'filled': None,
             'side': side,
             'type': None,
+            'timeInForce': None,
+            'postOnly': None,
             'status': status,
-            'symbol': symbol,
+            'symbol': marketResolved['symbol'],
             'price': price,
-            'cost': cost,
+            'triggerPrice': None,
+            'cost': None,
             'trades': trades,
             'fee': None,
             'info': order,
             'average': None,
-        }
+        }, marketResolved)
 
-    async def fetch_order(self, id, symbol=None, params={}):
-        await self.load_markets()
+    async def fetch_order(self, id: str, symbol: Str = None, params: dict = {}) -> Order:
+        """
+        fetches information on an order made by the user
+
+        https://blog.btcbox.jp/en/archives/8762#toc16
+
+        :param str id: the order id
+        :param str symbol: unified symbol of the market the order was made in
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: An `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            await self.load_markets()
         # a special case for btcbox – default symbol is BTC/JPY
-        if symbol is None:
-            symbol = 'BTC/JPY'
-        market = self.market(symbol)
+        symbolResolved = 'BTC/JPY' if (symbol is None) else symbol
+        market = self.market(symbolResolved)
         request = self.extend({
             'id': id,
             'coin': market['baseId'],
         }, params)
         response = await self.privatePostTradeView(self.extend(request, params))
+        #
+        #      {
+        #          "id":11,
+        #          "datetime":"2014-10-21 10:47:21",
+        #          "type":"sell",
+        #          "price":42000,
+        #          "amount_original":1.2,
+        #          "amount_outstanding":1.2,
+        #          "status":"closed",
+        #          "trades":[]
+        #      }
+        #
         return self.parse_order(response, market)
 
-    async def fetch_orders_by_type(self, type, symbol=None, since=None, limit=None, params={}):
-        await self.load_markets()
+    async def fetch_orders_by_type(self, type: Str, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Order]:
+        if self.markets is None:
+            await self.load_markets()
         # a special case for btcbox – default symbol is BTC/JPY
-        if symbol is None:
-            symbol = 'BTC/JPY'
-        market = self.market(symbol)
+        symbolResolved = 'BTC/JPY' if (symbol is None) else symbol
+        market = self.market(symbolResolved)
         request = {
             'type': type,  # 'open' or 'all'
             'coin': market['baseId'],
         }
         response = await self.privatePostTradeList(self.extend(request, params))
-        orders = self.parse_orders(response, market, since, limit)
-        # status(open/closed/canceled) is None
+        #
+        # [
+        #      {
+        #          "id":"7",
+        #          "datetime":"2014-10-20 13:27:38",
+        #          "type":"buy",
+        #          "price":42750,
+        #          "amount_original":0.235,
+        #          "amount_outstanding":0.235
+        #      },
+        # ]
+        #
+        # status (open/closed/canceled) is undefined
         # btcbox does not return status, but we know it's 'open' as we queried for open orders
+        extra = {}
         if type == 'open':
-            for i in range(0, len(orders)):
-                orders[i]['status'] = 'open'
-        return orders
+            extra['status'] = 'open'
+        return self.parse_orders(response, market, since, limit, extra)
 
-    async def fetch_orders(self, symbol=None, since=None, limit=None, params={}):
+    async def fetch_orders(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Order]:
+        """
+        fetches information on multiple orders made by the user
+
+        https://blog.btcbox.jp/en/archives/8762#toc15
+
+        :param str symbol: unified market symbol of the market orders were made in
+        :param int [since]: the earliest time in ms to fetch orders for
+        :param int [limit]: the maximum number of order structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
+        """
         return await self.fetch_orders_by_type('all', symbol, since, limit, params)
 
-    async def fetch_open_orders(self, symbol=None, since=None, limit=None, params={}):
+    async def fetch_open_orders(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Order]:
+        """
+        fetch all unfilled currently open orders
+
+        https://blog.btcbox.jp/en/archives/8762#toc15
+
+        :param str symbol: unified market symbol
+        :param int [since]: the earliest time in ms to fetch open orders for
+        :param int [limit]: the maximum number of  open orders structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
+        """
         return await self.fetch_orders_by_type('open', symbol, since, limit, params)
 
-    def nonce(self):
+    def nonce(self) -> int:
         return self.milliseconds()
 
-    def sign(self, path, api='public', method='GET', params={}, headers=None, body=None):
-        url = self.urls['api'] + '/' + self.version + '/' + path
-        if api == 'public':
-            if params:
-                url += '?' + self.urlencode(params)
+    def sign(self, path: str, api: list[str] = ['public'], method: str = 'GET', params: dict = {}) -> dict:
+        apiName = api[0]
+        apiUrl = self.safe_string(self.urls['api'], 'rest')
+        if apiUrl is None:
+            raise ExchangeError(self.id + ' sign() has no API URL for self endpoint')
+        url = apiUrl + '/' + self.version + '/' + path
+        if apiName == 'public':
+            if len(params) > 0:
+                url = apiUrl + '/' + self.version + '/' + path + '?' + self.urlencode(params)
+        elif apiName == 'webApi':
+            url = self.safe_string(self.urls, 'www', '') + '/' + path
         else:
             self.check_required_credentials()
-            nonce = str(self.nonce())
+            nonce = self.number_to_string(self.nonce())
             query = self.extend({
                 'key': self.apiKey,
                 'nonce': nonce,
             }, params)
             request = self.urlencode(query)
-            secret = self.hash(self.encode(self.secret))
-            query['signature'] = self.hmac(self.encode(request), self.encode(secret))
-            body = self.urlencode(query)
-            headers = {
+            secret = self.hash(self.encode(self.secret), 'md5')
+            query['signature'] = self.hmac(self.encode(request), self.encode(secret), hashlib.sha256)
+            signedBody = self.urlencode(query)
+            signedHeaders = {
                 'Content-Type': 'application/x-www-form-urlencoded',
             }
-        return {'url': url, 'method': method, 'body': body, 'headers': headers}
+            return {'url': url, 'method': method, 'body': signedBody, 'headers': signedHeaders}
+        return {'url': url, 'method': method, 'body': None, 'headers': None}
 
-    def handle_errors(self, httpCode, reason, url, method, headers, body, response, requestHeaders, requestBody):
+    def handle_errors(self, code: int, reason: str, url: str, method: str, headers: dict, body: str, response: object, requestHeaders: dict, requestBody: Str):
         if response is None:
-            return  # resort to defaultErrorHandler
+            return None  # resort to defaultErrorHandler
         # typical error response: {"result":false,"code":"401"}
-        if httpCode >= 400:
-            return  # resort to defaultErrorHandler
-        result = self.safe_value(response, 'result')
-        if result is None or result is True:
-            return  # either public API(no error codes expected) or success
-        code = self.safe_value(response, 'code')
+        if code >= 400:
+            return None  # resort to defaultErrorHandler
+        result = self.safe_bool(response, 'result')
+        if result is None or result:
+            return None  # either public API (no error codes expected) or success
+        codeError = self.safe_string(response, 'code')
         feedback = self.id + ' ' + body
-        self.throw_exactly_matched_exception(self.exceptions, code, feedback)
+        self.throw_exactly_matched_exception(self.exceptions, codeError, feedback)
         raise ExchangeError(feedback)  # unknown message
 
-    async def request(self, path, api='public', method='GET', params={}, headers=None, body=None):
-        response = await self.fetch2(path, api, method, params, headers, body)
-        if isinstance(response, basestring):
+    async def request(self, path: str, api: list[str] = ['public'], method='GET', params: dict = {}, config: dict = {}):
+        response = await self.fetch2(path, api, method, params, config)
+        if isinstance(response, str):
             # sometimes the exchange returns whitespace prepended to json
-            response = self.strip(response)
-            if not self.is_json_encoded_object(response):
-                raise ExchangeError(self.id + ' ' + response)
-            response = json.loads(response)
+            strippedResponse = self.strip(response)
+            if not self.is_json_encoded_object(strippedResponse):
+                raise ExchangeError(self.id + ' ' + strippedResponse)
+            response = json.loads(strippedResponse)
         return response

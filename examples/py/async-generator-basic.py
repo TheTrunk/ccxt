@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 
@@ -11,10 +14,7 @@ import ccxt.async_support as ccxt  # noqa: E402
 
 
 async def poll():
-    exchange = ccxt.poloniex({
-        'enableRateLimit': True,
-        # don't remove this line or they might ban you: https://github.com/ccxt/ccxt/wiki/Manual#rate-limit
-    })
+    exchange = ccxt.poloniex()
     while True:
         yield await exchange.fetch_ticker('ETH/BTC')
 
@@ -24,4 +24,4 @@ async def main():
         print(ticker)
 
 
-asyncio.get_event_loop().run_until_complete(main())
+run(main())

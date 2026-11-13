@@ -1,0 +1,199 @@
+namespace ccxt;
+
+public partial class BaseExchange
+{
+
+    public Int64 milliseconds()
+    {
+
+        DateTimeOffset dto = new DateTimeOffset(DateTime.UtcNow);
+        string unixTime = dto.ToUnixTimeSeconds().ToString();
+        return dto.ToUnixTimeMilliseconds();
+
+        // DateTimeOffset now = DateTimeOffset.UtcNow;
+        // long unixTimeMilliseconds = now.ToUnixTimeMilliseconds();
+        // // return unixTimeMilliseconds;
+        // DateTime unixEpoch = new DateTime(1970, 1, 1);
+        // DateTime currentTime = DateTime.UtcNow;
+        // TimeSpan elapsedTime = unixEpoch.Subtract(currentTime);
+
+        // long unixTimstamp = (long)elapsedTime.TotalMilliseconds;
+        // return unixTimstamp;
+        // DateTimeOffset now = (DateTimeOffset)DateTime.UtcNow;
+        // var res = now.ToUnixTimeMilliseconds();
+        // return res;
+
+
+    }
+
+    public virtual void setLastRestRequestTimestamp()
+    {
+        this.lastRestRequestTimestamp = this.milliseconds();
+    }
+
+    public virtual void setLastRequest(Dictionary<string, object> request)
+    {
+        this.last_request_headers = (request != null && request.ContainsKey("headers") ? request["headers"] : null);
+        this.last_request_body = (request != null && request.ContainsKey("body") ? request["body"] : null);
+        this.last_request_url = (request != null && request.ContainsKey("url") ? request["url"] : null);
+    }
+
+    public long microseconds()
+    {
+#if NET7_0_OR_GREATER
+        return DateTime.Now.Ticks / TimeSpan.TicksPerMicrosecond;
+#else
+        DateTime utcNow = DateTime.UtcNow;
+        DateTimeOffset dto = new DateTimeOffset(utcNow);
+        long unixTime = dto.ToUnixTimeMilliseconds() * 1000;
+        return unixTime + (utcNow.Ticks % TimeSpan.TicksPerSecond) / 10;
+#endif
+    }
+
+    // null (a non-string box, or an input DateTime.Parse rejects) or the Int64 ms value of
+    // the parsed date — every non-null path returns the `Int64 timestamp` local, so the
+    // nullable spelling names the box the call already produced (same as parse8601)
+    public Int64? parseDate(object datetime2)
+    {
+        if (datetime2 == null || datetime2.GetType() != typeof(string))
+        {
+            return null;
+        }
+        var datetime = (string)datetime2;
+        Int64 timestamp;
+        try
+        {
+            timestamp = (long)DateTime.Parse(datetime, null, System.Globalization.DateTimeStyles.RoundtripKind).Subtract(new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
+        }
+        catch (Exception e)
+        {
+            return null;
+        }
+        return timestamp;
+    }
+
+    public static string Iso8601(object ts = null)
+    {
+        if (ts == null)
+        {
+            return null;
+        }
+        if (ts is string s)
+        {
+            // only plain-integer strings are accepted, e.g. "1755432123456" (not "123abc" or "")
+            if (!System.Text.RegularExpressions.Regex.IsMatch(s, "^[0-9]+$"))
+            {
+                return null;
+            }
+        }
+        double milliseconds;
+        try
+        {
+            milliseconds = Convert.ToDouble(ts, System.Globalization.CultureInfo.InvariantCulture);
+        }
+        catch (Exception e)
+        {
+            return null;
+        }
+        if (double.IsNaN(milliseconds) || double.IsInfinity(milliseconds))
+        {
+            return null;
+        }
+        // non-integer numbers are floored (e.g. 514862627559.9 -> 514862627559)
+        Int64 startdatetime = (Int64)Math.Floor(milliseconds);
+        if (startdatetime < 0 || startdatetime > 8640000000000000L)
+        {
+            return null;
+        }
+        try
+        {
+            var date = (new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).AddMilliseconds(startdatetime);
+            return date.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", System.Globalization.CultureInfo.InvariantCulture);
+        }
+        catch (Exception e)
+        {
+            return null;
+        }
+    }
+
+    public string iso8601(object ts = null)
+    {
+        return Iso8601(ts);
+    }
+
+    public string ymdhms(object ts, object infix = null)
+    {
+        if (infix == null)
+        {
+            infix = " ";
+        }
+        // check this
+        if (ts == null)
+        {
+            return null;
+        }
+        var startdatetime = Convert.ToInt64(ts);
+        var date = (new DateTime(1970, 1, 1)).AddMilliseconds(startdatetime);
+        return date.ToString("yyyy" + "-" + "MM" + "-" + "dd" + infix + "HH:mm:ss");
+
+    }
+
+    public string yyyymmdd(object ts, object infix = null)
+    {
+        if (infix == null)
+        {
+            infix = "-";
+        }
+        // check this
+        if (ts == null)
+        {
+            return null;
+        }
+        var startdatetime = Convert.ToInt64(ts);
+        var date = (new DateTime(1970, 1, 1)).AddMilliseconds(startdatetime);
+        return date.ToString("yyyy" + infix + "MM" + infix + "dd");
+    }
+
+    public string yymmdd(object ts, object infix = null)
+    {
+        if (infix == null)
+        {
+            infix = "";
+        }
+        // check this
+        if (ts == null)
+        {
+            return null;
+        }
+        object startdatetime = null;
+        var date = "";
+        startdatetime = Convert.ToInt64(ts);
+        var tmp = (new DateTime(1970, 1, 1)).AddMilliseconds((Int64)startdatetime);
+        date = tmp.ToString("yy" + infix.ToString () + "MM" + infix.ToString () + "dd");
+        return date;
+    }
+
+    public object ymd(object ts, object infix = null) => yyyymmdd(ts, infix);
+
+    public Int64? parse8601(object datetime2 = null)
+    {
+        if (datetime2 == null || datetime2.GetType() != typeof(string))
+        {
+            return null;
+        }
+        var datetime = (string)datetime2;
+        Int64 timestamp;
+        try
+        {
+            // DateTimeOffset honours the offset the string declares instead of resolving it
+            // against the host clock; AssumeUniversal reads a zoneless string as UTC and
+            // AdjustToUniversal normalises both cases to UTC.
+            timestamp = System.DateTimeOffset.Parse(datetime, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal).ToUnixTimeMilliseconds();
+        }
+        catch (Exception e)
+        {
+            return null;
+        }
+        return timestamp;
+    }
+}

@@ -4,21 +4,122 @@
 # https://github.com/ccxt/ccxt/blob/master/CONTRIBUTING.md#how-to-contribute-code
 
 from ccxt.base.exchange import Exchange
+from ccxt.abstract.independentreserve import ImplicitAPI
+import hashlib
+from ccxt.base.types import Balances, Currency, DepositAddress, Int, Market, Num, Order, OrderBook, OrderSide, OrderType, Str, Ticker, Trade, TradingFees, Transaction
+from ccxt.base.errors import ExchangeError
+from ccxt.base.errors import BadRequest
+from ccxt.base.decimal_to_precision import TICK_SIZE
+from ccxt.base.precise import Precise
 
 
-class independentreserve(Exchange):
+class independentreserve(Exchange, ImplicitAPI):
 
-    def describe(self):
+    def describe(self) -> dict:
         return self.deep_extend(super(independentreserve, self).describe(), {
             'id': 'independentreserve',
             'name': 'Independent Reserve',
             'countries': ['AU', 'NZ'],  # Australia, New Zealand
             'rateLimit': 1000,
+            'pro': True,
             'has': {
-                'CORS': False,
+                'CORS': None,
+                'spot': True,
+                'margin': False,
+                'swap': False,
+                'future': False,
+                'option': False,
+                'addMargin': False,
+                'borrowCrossMargin': False,
+                'borrowIsolatedMargin': False,
+                'borrowMargin': False,
+                'cancelOrder': True,
+                'closeAllPositions': False,
+                'closePosition': False,
+                'createOrder': True,
+                'createReduceOnlyOrder': False,
+                'createStopLimitOrder': False,
+                'createStopMarketOrder': False,
+                'createStopOrder': False,
+                'fetchAllGreeks': False,
+                'fetchBalance': True,
+                'fetchBorrowInterest': False,
+                'fetchBorrowRate': False,
+                'fetchBorrowRateHistories': False,
+                'fetchBorrowRateHistory': False,
+                'fetchBorrowRates': False,
+                'fetchBorrowRatesPerSymbol': False,
+                'fetchClosedOrders': True,
+                'fetchCrossBorrowRate': False,
+                'fetchCrossBorrowRates': False,
+                'fetchCurrencies': False,
+                'fetchDepositAddress': True,
+                'fetchDepositAddresses': False,
+                'fetchDepositAddressesByNetwork': False,
+                'fetchFundingHistory': False,
+                'fetchFundingInterval': False,
+                'fetchFundingIntervals': False,
+                'fetchFundingRate': False,
+                'fetchFundingRateHistory': False,
+                'fetchFundingRates': False,
+                'fetchGreeks': False,
+                'fetchIndexOHLCV': False,
+                'fetchIsolatedBorrowRate': False,
+                'fetchIsolatedBorrowRates': False,
+                'fetchIsolatedPositions': False,
+                'fetchLeverage': False,
+                'fetchLeverages': False,
+                'fetchLeverageTiers': False,
+                'fetchLiquidations': False,
+                'fetchLongShortRatio': False,
+                'fetchLongShortRatioHistory': False,
+                'fetchMarginAdjustmentHistory': False,
+                'fetchMarginMode': False,
+                'fetchMarginModes': False,
+                'fetchMarketLeverageTiers': False,
+                'fetchMarkets': True,
+                'fetchMarkOHLCV': False,
+                'fetchMarkPrice': False,
+                'fetchMarkPrices': False,
+                'fetchMyLiquidations': False,
+                'fetchMySettlementHistory': False,
+                'fetchMyTrades': True,
+                'fetchOpenInterest': False,
+                'fetchOpenInterestHistory': False,
+                'fetchOpenInterests': False,
+                'fetchOpenOrders': True,
+                'fetchOption': False,
+                'fetchOptionChain': False,
+                'fetchOrder': True,
+                'fetchOrderBook': True,
+                'fetchPosition': False,
+                'fetchPositionForSymbolWs': False,
+                'fetchPositionHistory': False,
+                'fetchPositionMode': False,
+                'fetchPositions': False,
+                'fetchPositionsForSymbol': False,
+                'fetchPositionsForSymbolWs': False,
+                'fetchPositionsHistory': False,
+                'fetchPositionsRisk': False,
+                'fetchPremiumIndexOHLCV': False,
+                'fetchSettlementHistory': False,
+                'fetchTicker': True,
+                'fetchTrades': True,
+                'fetchTradingFee': False,
+                'fetchTradingFees': True,
+                'fetchUnderlyingAssets': False,
+                'fetchVolatilityHistory': False,
+                'reduceMargin': False,
+                'repayCrossMargin': False,
+                'repayIsolatedMargin': False,
+                'setLeverage': False,
+                'setMargin': False,
+                'setMarginMode': False,
+                'setPositionMode': False,
+                'withdraw': True,
             },
             'urls': {
-                'logo': 'https://user-images.githubusercontent.com/1294454/30521662-cf3f477c-9bcb-11e7-89bc-d1ac85012eda.jpg',
+                'logo': 'https://user-images.githubusercontent.com/51840849/87182090-1e9e9080-c2ec-11ea-8e49-563db9a38f37.jpg',
                 'api': {
                     'public': 'https://api.independentreserve.com/Public',
                     'private': 'https://api.independentreserve.com/Private',
@@ -28,97 +129,317 @@ class independentreserve(Exchange):
             },
             'api': {
                 'public': {
-                    'get': [
-                        'GetValidPrimaryCurrencyCodes',
-                        'GetValidSecondaryCurrencyCodes',
-                        'GetValidLimitOrderTypes',
-                        'GetValidMarketOrderTypes',
-                        'GetValidOrderTypes',
-                        'GetValidTransactionTypes',
-                        'GetMarketSummary',
-                        'GetOrderBook',
-                        'GetAllOrders',
-                        'GetTradeHistorySummary',
-                        'GetRecentTrades',
-                        'GetFxRates',
-                    ],
+                    'get': {
+                        'GetValidPrimaryCurrencyCodes': {'cost': 1},
+                        'GetValidSecondaryCurrencyCodes': {'cost': 1},
+                        'GetValidLimitOrderTypes': {'cost': 1},
+                        'GetValidMarketOrderTypes': {'cost': 1},
+                        'GetValidOrderTypes': {'cost': 1},
+                        'GetValidTransactionTypes': {'cost': 1},
+                        'GetMarketSummary': {'cost': 1},
+                        'GetOrderBook': {'cost': 1},
+                        'GetAllOrders': {'cost': 1},
+                        'GetTradeHistorySummary': {'cost': 1},
+                        'GetRecentTrades': {'cost': 1},
+                        'GetFxRates': {'cost': 1},
+                        'GetOrderMinimumVolumes': {'cost': 1},
+                        'GetDepositFees': {'cost': 1},
+                        'GetFiatWithdrawalFees': {'cost': 1},
+                        'GetCryptoWithdrawalFees': {'cost': 1},
+                        'GetCryptoWithdrawalFees2': {'cost': 1},
+                        'GetNetworks': {'cost': 1},
+                        'GetPrimaryCurrencyConfig2': {'cost': 1},
+                    },
                 },
                 'private': {
-                    'post': [
-                        'PlaceLimitOrder',
-                        'PlaceMarketOrder',
-                        'CancelOrder',
-                        'GetOpenOrders',
-                        'GetClosedOrders',
-                        'GetClosedFilledOrders',
-                        'GetOrderDetails',
-                        'GetAccounts',
-                        'GetTransactions',
-                        'GetDigitalCurrencyDepositAddress',
-                        'GetDigitalCurrencyDepositAddresses',
-                        'SynchDigitalCurrencyDepositAddressWithBlockchain',
-                        'WithdrawDigitalCurrency',
-                        'RequestFiatWithdrawal',
-                        'GetTrades',
-                        'GetBrokerageFees',
-                    ],
+                    'post': {
+                        'GetOpenOrders': {'cost': 1},
+                        'GetClosedOrders': {'cost': 1},
+                        'GetClosedFilledOrders': {'cost': 1},
+                        'GetOrderDetails': {'cost': 1},
+                        'GetAccounts': {'cost': 1},
+                        'GetTransactions': {'cost': 1},
+                        'GetFiatBankAccounts': {'cost': 1},
+                        'GetDigitalCurrencyDepositAddress': {'cost': 1},
+                        'GetDigitalCurrencyDepositAddress2': {'cost': 1},
+                        'GetDigitalCurrencyDepositAddresses': {'cost': 1},
+                        'GetDigitalCurrencyDepositAddresses2': {'cost': 1},
+                        'GetTrades': {'cost': 1},
+                        'GetTradesByOrder': {'cost': 1},
+                        'GetBrokerageFees': {'cost': 1},
+                        'GetDigitalCurrencyWithdrawal': {'cost': 1},
+                        'GetFiatWithdrawal': {'cost': 1},
+                        'GetDepositLimits': {'cost': 1},
+                        'GetWithdrawalLimits': {'cost': 1},
+                        'PlaceLimitOrder': {'cost': 1},
+                        'PlaceMarketOrder': {'cost': 1},
+                        'CancelOrder': {'cost': 1},
+                        'CancelOrders': {'cost': 1},
+                        'SynchDigitalCurrencyDepositAddressWithBlockchain': {'cost': 1},
+                        'RequestFiatWithdrawal': {'cost': 1},
+                        'WithdrawFiatCurrency': {'cost': 1},
+                        'WithdrawDigitalCurrency': {'cost': 1},
+                        'WithdrawCrypto': {'cost': 1},
+                    },
                 },
             },
             'fees': {
                 'trading': {
-                    'taker': 0.5 / 100,
-                    'maker': 0.5 / 100,
+                    'taker': self.parse_number('0.005'),
+                    'maker': self.parse_number('0.005'),
                     'percentage': True,
                     'tierBased': False,
+                },
+            },
+            'features': {
+                'spot': {
+                    'sandbox': False,
+                    'createOrder': {
+                        'marginMode': False,
+                        'triggerPrice': False,
+                        'triggerPriceType': None,
+                        'triggerDirection': False,
+                        'stopLossPrice': False,
+                        'takeProfitPrice': False,
+                        'attachedStopLossTakeProfit': None,
+                        'timeInForce': {
+                            'GTC': True,
+                            'IOC': True,
+                            'FOK': True,
+                            'PO': True,
+                            'GTD': False,
+                        },
+                        'hedged': False,
+                        'selfTradePrevention': False,
+                        'trailing': False,
+                        'leverage': False,
+                        'marketBuyByCost': False,
+                        'marketBuyRequiresPrice': False,
+                        'iceberg': False,
+                    },
+                    'createOrders': None,
+                    'fetchMyTrades': {
+                        'marginMode': False,
+                        'limit': 100,  # todo
+                        'daysBack': None,
+                        'untilDays': None,
+                        'symbolRequired': False,
+                    },
+                    'fetchOrder': {
+                        'marginMode': False,
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': False,
+                    },
+                    'fetchOpenOrders': {
+                        'marginMode': False,
+                        'limit': 100,  # todo
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': False,
+                    },
+                    'fetchOrders': None,
+                    'fetchClosedOrders': {
+                        'marginMode': False,
+                        'limit': 100,  # todo
+                        'daysBack': None,
+                        'daysBackCanceled': None,
+                        'untilDays': None,
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': False,
+                    },
+                    'fetchOHLCV': None,
+                },
+                'swap': {
+                    'linear': None,
+                    'inverse': None,
+                },
+                'future': {
+                    'linear': None,
+                    'inverse': None,
                 },
             },
             'commonCurrencies': {
                 'PLA': 'PlayChip',
             },
+            'precisionMode': TICK_SIZE,
+            'options': {
+                'defaultNetworks': {
+                    'USDT': 'Ethereum',
+                    'USDC': 'Ethereum',
+                    'BTC': 'Bitcoin',
+                    'BCH': 'BitcoinCash',
+                    'ETH': 'Ethereum',
+                    'LTC': 'Litecoin',
+                    'XRP': 'XrpLedger',
+                    'ZRX': 'Ethereum',
+                    'EOS': 'EosIo',
+                    'XLM': 'Stellar',
+                    'BAT': 'Ethereum',
+                    'ETC': 'EthereumClassic',
+                    'LINK': 'Ethereum',
+                    'MKR': 'Ethereum',
+                    'DAI': 'Ethereum',
+                    'COMP': 'Ethereum',
+                    'SNX': 'Ethereum',
+                    'YFI': 'Ethereum',
+                    'AAVE': 'Ethereum',
+                    'GRT': 'Ethereum',
+                    'DOT': 'Polkadot',
+                    'UNI': 'Ethereum',
+                    'ADA': 'Cardano',
+                    'MATIC': 'Ethereum',
+                    'DOGE': 'Dogecoin',
+                    'SOL': 'Solana',
+                    'MANA': 'Ethereum',
+                    'SAND': 'Ethereum',
+                    'SHIB': 'Ethereum',
+                    'TRX': 'Tron',
+                    'RENDER': 'Solana',
+                    'WIF': 'Solana',
+                    'RLUSD': 'Ethereum',
+                    'PEPE': 'Ethereum',
+                },
+                'networks': {
+                    'BTC': 'Bitcoin',
+                    'ERC20': 'Ethereum',
+                    'BCH': 'BitcoinCash',
+                    'LTC': 'Litecoin',
+                    'XRP': 'XrpLedger',
+                    'EOS': 'EosIo',
+                    'XLM': 'Stellar',
+                    'ETC': 'EthereumClassic',
+                    'BSV': 'BitcoinSV',
+                    'DOGE': 'Dogecoin',
+                    'DOT': 'Polkadot',
+                    'ADA': 'Cardano',
+                    'SOL': 'Solana',
+                    'TRC20': 'Tron',
+                },
+            },
         })
 
-    def fetch_markets(self, params={}):
-        baseCurrencies = self.publicGetGetValidPrimaryCurrencyCodes(params)
-        quoteCurrencies = self.publicGetGetValidSecondaryCurrencyCodes(params)
+    def fetch_markets(self, params: dict = {}) -> list[Market]:
+        """
+        retrieves data on all markets for independentreserve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict[]: an array of objects representing market data
+        """
+        baseCurrenciesPromise = self.publicGetGetValidPrimaryCurrencyCodes(params)
+        #     ['Xbt', 'Eth', 'Usdt', ...]
+        quoteCurrenciesPromise = self.publicGetGetValidSecondaryCurrencyCodes(params)
+        #     ['Aud', 'Usd', 'Nzd', 'Sgd']
+        limitsPromise = self.publicGetGetOrderMinimumVolumes(params)
+        responses = [baseCurrenciesPromise, quoteCurrenciesPromise, limitsPromise]
+        limits = self.safe_value(responses, 2)
+        #
+        #     {
+        #         "Xbt": 0.0001,
+        #         "Eth": 0.001,
+        #         "Ltc": 0.01,
+        #         "Xrp": 1.0,
+        #     }
+        #
         result = []
-        for i in range(0, len(baseCurrencies)):
-            baseId = baseCurrencies[i]
+        baseCurrencyIds = self.to_array(self.safe_value(responses, 0))
+        quoteCurrencyIds = self.to_array(self.safe_value(responses, 1))
+        for i in range(0, len(baseCurrencyIds)):
+            baseId = self.safe_string(baseCurrencyIds, i, '')
             base = self.safe_currency_code(baseId)
-            for j in range(0, len(quoteCurrencies)):
-                quoteId = quoteCurrencies[j]
+            minAmount = self.safe_number(limits, baseId)
+            for j in range(0, len(quoteCurrencyIds)):
+                quoteId = self.safe_string(quoteCurrencyIds, j, '')
                 quote = self.safe_currency_code(quoteId)
+                if (base is None) or (quote is None):
+                    continue
                 id = baseId + '/' + quoteId
-                symbol = base + '/' + quote
                 result.append({
                     'id': id,
-                    'symbol': symbol,
+                    'symbol': base + '/' + quote,
                     'base': base,
                     'quote': quote,
+                    'settle': None,
                     'baseId': baseId,
                     'quoteId': quoteId,
-                    'info': id,
+                    'settleId': None,
+                    'type': 'spot',
+                    'spot': True,
+                    'margin': False,
+                    'swap': False,
+                    'future': False,
+                    'option': False,
                     'active': None,
-                    'precision': self.precision,
-                    'limits': self.limits,
+                    'contract': False,
+                    'linear': None,
+                    'inverse': None,
+                    'contractSize': None,
+                    'expiry': None,
+                    'expiryDatetime': None,
+                    'strike': None,
+                    'optionType': None,
+                    'precision': {
+                        'amount': None,
+                        'price': None,
+                    },
+                    'limits': {
+                        'leverage': {
+                            'min': None,
+                            'max': None,
+                        },
+                        'amount': {
+                            'min': minAmount,
+                            'max': None,
+                        },
+                        'price': {
+                            'min': None,
+                            'max': None,
+                        },
+                        'cost': {
+                            'min': None,
+                            'max': None,
+                        },
+                    },
+                    'created': None,
+                    'info': {'primaryCurrencyCode': baseId, 'secondaryCurrencyCode': quoteId},
                 })
         return result
 
-    def fetch_balance(self, params={}):
-        self.load_markets()
-        balances = self.privatePostGetAccounts(params)
-        result = {'info': balances}
-        for i in range(0, len(balances)):
-            balance = balances[i]
+    def parse_balance_list(self, response: list[dict]) -> Balances:
+        result = {'info': response}
+        accounts = self.to_array(response)
+        for i in range(0, len(accounts)):
+            balance = self.safe_dict(accounts, i)
             currencyId = self.safe_string(balance, 'CurrencyCode')
             code = self.safe_currency_code(currencyId)
             account = self.account()
-            account['free'] = self.safe_float(balance, 'AvailableBalance')
-            account['total'] = self.safe_float(balance, 'TotalBalance')
-            result[code] = account
-        return self.parse_balance(result)
+            account['free'] = self.safe_string(balance, 'AvailableBalance')
+            account['total'] = self.safe_string(balance, 'TotalBalance')
+            if code is not None:
+                result[code] = account
+        return self.safe_balance(result)
 
-    def fetch_order_book(self, symbol, limit=None, params={}):
-        self.load_markets()
+    def fetch_balance(self, params: dict = {}) -> Balances:
+        """
+        query for balance and get the amount of funds available for trading or funds locked in orders
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a `balance structure <https://docs.ccxt.com/?id=balance-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
+        response = self.privatePostGetAccounts(params)
+        return self.parse_balance_list(response)
+
+    def fetch_order_book(self, symbol: str, limit: Int = None, params: dict = {}) -> OrderBook:
+        """
+        fetches information on open orders with bid(buy) and ask(sell) prices, volumes and other data
+        :param str symbol: unified symbol of the market to fetch the order book for
+        :param int [limit]: the maximum amount of order book entries to return
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `order book structure <https://docs.ccxt.com/?id=order-book-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         market = self.market(symbol)
         request = {
             'primaryCurrencyCode': market['baseId'],
@@ -126,23 +447,40 @@ class independentreserve(Exchange):
         }
         response = self.publicGetGetOrderBook(self.extend(request, params))
         timestamp = self.parse8601(self.safe_string(response, 'CreatedTimestampUtc'))
-        return self.parse_order_book(response, timestamp, 'BuyOrders', 'SellOrders', 'Price', 'Volume')
+        return self.parse_order_book(response, market['symbol'], timestamp, 'BuyOrders', 'SellOrders', 'Price', 'Volume')
 
-    def parse_ticker(self, ticker, market=None):
+    def parse_ticker(self, ticker: dict, market: Market = None) -> Ticker:
+        # {
+        #     "DayHighestPrice":43489.49,
+        #     "DayLowestPrice":41998.32,
+        #     "DayAvgPrice":42743.9,
+        #     "DayVolumeXbt":44.54515625000,
+        #     "DayVolumeXbtInSecondaryCurrrency":0.12209818,
+        #     "CurrentLowestOfferPrice":43619.64,
+        #     "CurrentHighestBidPrice":43153.58,
+        #     "LastPrice":43378.43,
+        #     "PrimaryCurrencyCode":"Xbt",
+        #     "SecondaryCurrencyCode":"Usd",
+        #     "CreatedTimestampUtc":"2022-01-14T22:52:29.5029223Z"
+        # }
         timestamp = self.parse8601(self.safe_string(ticker, 'CreatedTimestampUtc'))
-        symbol = None
-        if market:
-            symbol = market['symbol']
-        last = self.safe_float(ticker, 'LastPrice')
-        return {
+        baseId = self.safe_string(ticker, 'PrimaryCurrencyCode')
+        quoteId = self.safe_string(ticker, 'SecondaryCurrencyCode')
+        defaultMarketId = None
+        if (baseId is not None) and (quoteId is not None):
+            defaultMarketId = baseId + '/' + quoteId
+        marketResolved = self.safe_market(defaultMarketId, market, '/')
+        symbol = marketResolved['symbol']
+        last = self.safe_string(ticker, 'LastPrice')
+        return self.safe_ticker({
             'symbol': symbol,
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
-            'high': self.safe_float(ticker, 'DayHighestPrice'),
-            'low': self.safe_float(ticker, 'DayLowestPrice'),
-            'bid': self.safe_float(ticker, 'CurrentHighestBidPrice'),
+            'high': self.safe_string(ticker, 'DayHighestPrice'),
+            'low': self.safe_string(ticker, 'DayLowestPrice'),
+            'bid': self.safe_string(ticker, 'CurrentHighestBidPrice'),
             'bidVolume': None,
-            'ask': self.safe_float(ticker, 'CurrentLowestOfferPrice'),
+            'ask': self.safe_string(ticker, 'CurrentLowestOfferPrice'),
             'askVolume': None,
             'vwap': None,
             'open': None,
@@ -151,23 +489,45 @@ class independentreserve(Exchange):
             'previousClose': None,
             'change': None,
             'percentage': None,
-            'average': self.safe_float(ticker, 'DayAvgPrice'),
-            'baseVolume': self.safe_float(ticker, 'DayVolumeXbtInSecondaryCurrrency'),
+            'average': self.safe_string(ticker, 'DayAvgPrice'),
+            'baseVolume': self.safe_string(ticker, 'DayVolumeXbtInSecondaryCurrrency'),
             'quoteVolume': None,
             'info': ticker,
-        }
+        }, marketResolved)
 
-    def fetch_ticker(self, symbol, params={}):
-        self.load_markets()
+    def fetch_ticker(self, symbol: str, params: dict = {}) -> Ticker:
+        """
+        fetches a price ticker, a statistical calculation with the information calculated over the past 24 hours for a specific market
+        :param str symbol: unified symbol of the market to fetch the ticker for
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a `ticker structure <https://docs.ccxt.com/?id=ticker-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         market = self.market(symbol)
         request = {
             'primaryCurrencyCode': market['baseId'],
             'secondaryCurrencyCode': market['quoteId'],
         }
         response = self.publicGetGetMarketSummary(self.extend(request, params))
+        # {
+        #     "DayHighestPrice":43489.49,
+        #     "DayLowestPrice":41998.32,
+        #     "DayAvgPrice":42743.9,
+        #     "DayVolumeXbt":44.54515625000,
+        #     "DayVolumeXbtInSecondaryCurrrency":0.12209818,
+        #     "CurrentLowestOfferPrice":43619.64,
+        #     "CurrentHighestBidPrice":43153.58,
+        #     "LastPrice":43378.43,
+        #     "PrimaryCurrencyCode":"Xbt",
+        #     "SecondaryCurrencyCode":"Usd",
+        #     "CreatedTimestampUtc":"2022-01-14T22:52:29.5029223Z"
+        # }
         return self.parse_ticker(response, market)
 
-    def parse_order(self, order, market=None):
+    def parse_order(self, order: dict, market: Market = None) -> Order:
+        #
+        # fetchOrder
         #
         #     {
         #         "OrderGuid": "c7347e4c-b865-4c94-8f74-d934d4b0b177",
@@ -183,74 +543,98 @@ class independentreserve(Exchange):
         #         "SecondaryCurrencyCode": "Usd"
         #     }
         #
+        # fetchOpenOrders & fetchClosedOrders
+        #
+        #     {
+        #         "OrderGuid": "b8f7ad89-e4e4-4dfe-9ea3-514d38b5edb3",
+        #         "CreatedTimestampUtc": "2020-09-08T03:04:18.616367Z",
+        #         "OrderType": "LimitOffer",
+        #         "Volume": 0.0005,
+        #         "Outstanding": 0.0005,
+        #         "Price": 113885.83,
+        #         "AvgPrice": 113885.83,
+        #         "Value": 56.94,
+        #         "Status": "Open",
+        #         "PrimaryCurrencyCode": "Xbt",
+        #         "SecondaryCurrencyCode": "Usd",
+        #         "FeePercent": 0.005,
+        #     }
+        #
+        # cancelOrder
+        #
+        #    {
+        #        "AvgPrice": 455.48,
+        #        "CreatedTimestampUtc": "2022-08-05T06:42:11.3032208Z",
+        #        "OrderGuid": "719c495c-a39e-4884-93ac-280b37245037",
+        #        "Price": 485.76,
+        #        "PrimaryCurrencyCode": "Xbt",
+        #        "ReservedAmount": 0.358,
+        #        "SecondaryCurrencyCode": "Usd",
+        #        "Status": "Cancelled",
+        #        "Type": "LimitOffer",
+        #        "VolumeFilled": 0,
+        #        "VolumeOrdered": 0.358
+        #    }
         symbol = None
         baseId = self.safe_string(order, 'PrimaryCurrencyCode')
-        quoteId = self.safe_string(order, 'PrimaryCurrencyCode')
+        quoteId = self.safe_string(order, 'SecondaryCurrencyCode')
         base = None
         quote = None
         if (baseId is not None) and (quoteId is not None):
             base = self.safe_currency_code(baseId)
             quote = self.safe_currency_code(quoteId)
-            symbol = base + '/' + quote
+            if (base is not None) and (quote is not None):
+                symbol = base + '/' + quote
         elif market is not None:
-            symbol = market['symbol']
-            base = market['base']
-            quote = market['quote']
-        orderType = self.safe_value(order, 'Type')
-        if orderType.find('Market') >= 0:
-            orderType = 'market'
-        elif orderType.find('Limit') >= 0:
-            orderType = 'limit'
+            symbol = self.safe_string(market, 'symbol')
+            base = self.safe_string(market, 'base')
+            quote = self.safe_string(market, 'quote')
+        orderType = self.safe_string_2(order, 'Type', 'OrderType')
         side = None
-        if orderType.find('Bid') >= 0:
-            side = 'buy'
-        elif orderType.find('Offer') >= 0:
-            side = 'sell'
+        if orderType is not None:
+            if orderType.find('Bid') >= 0:
+                side = 'buy'
+            elif orderType.find('Offer') >= 0:
+                side = 'sell'
+            if orderType.find('Market') >= 0:
+                orderType = 'market'
+            elif orderType.find('Limit') >= 0:
+                orderType = 'limit'
         timestamp = self.parse8601(self.safe_string(order, 'CreatedTimestampUtc'))
-        amount = self.safe_float(order, 'VolumeOrdered')
-        if amount is None:
-            amount = self.safe_float(order, 'Volume')
-        filled = self.safe_float(order, 'VolumeFilled')
-        remaining = None
-        feeRate = self.safe_float(order, 'FeePercent')
+        filled = self.safe_string(order, 'VolumeFilled')
+        feeRate = self.safe_string(order, 'FeePercent')
         feeCost = None
-        if amount is not None:
-            if filled is not None:
-                remaining = amount - filled
-                if feeRate is not None:
-                    feeCost = feeRate * filled
-        fee = {
-            'rate': feeRate,
-            'cost': feeCost,
-            'currency': base,
-        }
-        id = self.safe_string(order, 'OrderGuid')
-        status = self.parse_order_status(self.safe_string(order, 'Status'))
-        cost = self.safe_float(order, 'Value')
-        average = self.safe_float(order, 'AvgPrice')
-        price = self.safe_float(order, 'Price', average)
-        return {
+        if feeRate is not None and filled is not None:
+            feeCost = Precise.string_mul(feeRate, filled)
+        return self.safe_order({
             'info': order,
-            'id': id,
+            'id': self.safe_string(order, 'OrderGuid'),
             'clientOrderId': None,
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
             'lastTradeTimestamp': None,
             'symbol': symbol,
             'type': orderType,
+            'timeInForce': self.parse_time_in_force(self.safe_string(order, 'TimeInForce')),
+            'postOnly': None,
             'side': side,
-            'price': price,
-            'cost': cost,
-            'average': average,
-            'amount': amount,
+            'price': self.safe_string(order, 'Price'),
+            'triggerPrice': None,
+            'cost': self.safe_string(order, 'Value'),
+            'average': self.safe_string(order, 'AvgPrice'),
+            'amount': self.safe_string_2(order, 'VolumeOrdered', 'Volume'),
             'filled': filled,
-            'remaining': remaining,
-            'status': status,
-            'fee': fee,
+            'remaining': self.safe_string(order, 'Outstanding'),
+            'status': self.parse_order_status(self.safe_string(order, 'Status')),
+            'fee': {
+                'rate': feeRate,
+                'cost': feeCost,
+                'currency': base,
+            },
             'trades': None,
-        }
+        }, market)
 
-    def parse_order_status(self, status):
+    def parse_order_status(self, status: Str) -> Str:
         statuses = {
             'Open': 'open',
             'PartiallyFilled': 'open',
@@ -259,11 +643,29 @@ class independentreserve(Exchange):
             'Cancelled': 'canceled',
             'PartiallyFilledAndExpired': 'canceled',
             'Expired': 'canceled',
+            'Failed': 'canceled',
         }
         return self.safe_string(statuses, status, status)
 
-    def fetch_order(self, id, symbol=None, params={}):
-        self.load_markets()
+    def parse_time_in_force(self, timeInForce: Str) -> Str:
+        timeInForces = {
+            'Gtc': 'GTC',
+            'Moc': 'PO',
+            'Fok': 'FOK',
+            'Ioc': 'IOC',
+        }
+        return self.safe_string(timeInForces, timeInForce, timeInForce)
+
+    def fetch_order(self, id: str, symbol: Str = None, params: dict = {}) -> Order:
+        """
+        fetches information on an order made by the user
+        :param str id: order id
+        :param str symbol: unified symbol of the market the order was made in
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: An `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         response = self.privatePostGetOrderDetails(self.extend({
             'orderGuid': id,
         }, params))
@@ -272,41 +674,102 @@ class independentreserve(Exchange):
             market = self.market(symbol)
         return self.parse_order(response, market)
 
-    def fetch_my_trades(self, symbol=None, since=None, limit=50, params={}):
-        self.load_markets()
+    def fetch_open_orders(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Order]:
+        """
+        fetch all unfilled currently open orders
+        :param str symbol: unified market symbol
+        :param int [since]: the earliest time in ms to fetch open orders for
+        :param int [limit]: the maximum number of  open orders structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
+        request = {}
+        market = None
+        if symbol is not None:
+            market = self.market(symbol)
+            request['primaryCurrencyCode'] = market['baseId']
+            request['secondaryCurrencyCode'] = market['quoteId']
+        limitResolved = 50 if (limit is None) else limit
+        request['pageIndex'] = 1
+        request['pageSize'] = limitResolved
+        response = self.privatePostGetOpenOrders(self.extend(request, params))
+        data = self.safe_list(response, 'Data', [])
+        return self.parse_orders(data, market, since, limitResolved)
+
+    def fetch_closed_orders(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Order]:
+        """
+        fetches information on multiple closed orders made by the user
+        :param str symbol: unified market symbol of the market orders were made in
+        :param int [since]: the earliest time in ms to fetch orders for
+        :param int [limit]: the maximum number of order structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
+        request = {}
+        market = None
+        if symbol is not None:
+            market = self.market(symbol)
+            request['primaryCurrencyCode'] = market['baseId']
+            request['secondaryCurrencyCode'] = market['quoteId']
+        limitResolved = 50 if (limit is None) else limit
+        request['pageIndex'] = 1
+        request['pageSize'] = limitResolved
+        response = self.privatePostGetClosedOrders(self.extend(request, params))
+        data = self.safe_list(response, 'Data', [])
+        return self.parse_orders(data, market, since, limitResolved)
+
+    def fetch_my_trades(self, symbol: Str = None, since: Int = None, limit: Int = 50, params: dict = {}) -> list[Trade]:
+        """
+        fetch all trades made by the user
+        :param str symbol: unified market symbol
+        :param int [since]: the earliest time in ms to fetch trades for
+        :param int [limit]: the maximum number of trades structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Trade[]: a list of `trade structures <https://docs.ccxt.com/?id=trade-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         pageIndex = self.safe_integer(params, 'pageIndex', 1)
-        if limit is None:
-            limit = 50
-        request = self.ordered({
+        limitResolved = limit
+        if limitResolved is None:
+            limitResolved = 50
+        request = {
             'pageIndex': pageIndex,
-            'pageSize': limit,
-        })
+            'pageSize': limitResolved,
+        }
         response = self.privatePostGetTrades(self.extend(request, params))
         market = None
         if symbol is not None:
             market = self.market(symbol)
-        return self.parse_trades(response['Data'], market, since, limit)
+        data = self.safe_list(response, 'Data', [])
+        return self.parse_trades(data, market, since, limitResolved)
 
-    def parse_trade(self, trade, market=None):
-        timestamp = self.parse8601(trade['TradeTimestampUtc'])
+    def parse_trade(self, trade: dict, market: Market = None) -> Trade:
+        timestamp = self.parse8601(self.safe_string(trade, 'TradeTimestampUtc'))
         id = self.safe_string(trade, 'TradeGuid')
         orderId = self.safe_string(trade, 'OrderGuid')
-        price = self.safe_float_2(trade, 'Price', 'SecondaryCurrencyTradePrice')
-        amount = self.safe_float_2(trade, 'VolumeTraded', 'PrimaryCurrencyAmount')
-        cost = None
-        if price is not None:
-            if amount is not None:
-                cost = price * amount
-        symbol = None
-        if market is not None:
-            symbol = market['symbol']
+        priceString = self.safe_string_2(trade, 'Price', 'SecondaryCurrencyTradePrice')
+        amountString = self.safe_string_2(trade, 'VolumeTraded', 'PrimaryCurrencyAmount')
+        price = self.parse_number(priceString)
+        amount = self.parse_number(amountString)
+        cost = self.parse_number(Precise.string_mul(priceString, amountString))
+        baseId = self.safe_string(trade, 'PrimaryCurrencyCode')
+        quoteId = self.safe_string(trade, 'SecondaryCurrencyCode')
+        marketId = None
+        if (baseId is not None) and (quoteId is not None):
+            marketId = baseId + '/' + quoteId
+        symbol = self.safe_symbol(marketId, market, '/')
         side = self.safe_string(trade, 'OrderType')
         if side is not None:
             if side.find('Bid') >= 0:
                 side = 'buy'
             elif side.find('Offer') >= 0:
                 side = 'sell'
-        return {
+        return self.safe_trade({
             'id': id,
             'info': trade,
             'timestamp': timestamp,
@@ -320,10 +783,19 @@ class independentreserve(Exchange):
             'amount': amount,
             'cost': cost,
             'fee': None,
-        }
+        }, market)
 
-    def fetch_trades(self, symbol, since=None, limit=None, params={}):
-        self.load_markets()
+    def fetch_trades(self, symbol: str, since: Int = None, limit: Int = None, params: dict = {}) -> list[Trade]:
+        """
+        get the list of most recent trades for a particular symbol
+        :param str symbol: unified symbol of the market to fetch trades for
+        :param int [since]: timestamp in ms of the earliest trade to fetch
+        :param int [limit]: the maximum amount of trades to fetch
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns Trade[]: a list of `trade structures <https://docs.ccxt.com/?id=public-trades>`
+        """
+        if self.markets is None:
+            self.load_markets()
         market = self.market(symbol)
         request = {
             'primaryCurrencyCode': market['baseId'],
@@ -331,63 +803,311 @@ class independentreserve(Exchange):
             'numberOfRecentTradesToRetrieve': 50,  # max = 50
         }
         response = self.publicGetGetRecentTrades(self.extend(request, params))
-        return self.parse_trades(response['Trades'], market, since, limit)
+        trades = self.safe_list(response, 'Trades', [])
+        return self.parse_trades(trades, market, since, limit)
 
-    def create_order(self, symbol, type, side, amount, price=None, params={}):
-        self.load_markets()
+    def fetch_trading_fees(self, params: dict = {}) -> TradingFees:
+        """
+        fetch the trading fees for multiple markets
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a dictionary of `fee structures <https://docs.ccxt.com/?id=fee-structure>` indexed by market symbols
+        """
+        if self.markets is None:
+            self.load_markets()
+        response = self.privatePostGetBrokerageFees(params)
+        #
+        #     [
+        #         {
+        #             "CurrencyCode": "Xbt",
+        #             "Fee": 0.005
+        #         }
+        #         ...
+        #     ]
+        #
+        fees = {}
+        rows = self.to_array(response)
+        for i in range(0, len(rows)):
+            fee = rows[i]
+            currencyId = self.safe_string(fee, 'CurrencyCode')
+            code = self.safe_currency_code(currencyId)
+            tradingFee = self.safe_number(fee, 'Fee')
+            if code is not None:
+                fees[code] = {
+                    'info': fee,
+                    'fee': tradingFee,
+                }
+        result = {}
+        symbols = self.symbols
+        for i in range(0, len(symbols)):
+            symbol = symbols[i]
+            market = self.market(symbol)
+            fee = self.safe_dict(fees, market['base'], {})
+            result[symbol] = {
+                'info': self.safe_dict(fee, 'info'),
+                'symbol': symbol,
+                'maker': self.safe_number(fee, 'fee'),
+                'taker': self.safe_number(fee, 'fee'),
+                'percentage': True,
+                'tierBased': True,
+            }
+        return result
+
+    def create_order(self, symbol: str, type: OrderType, side: OrderSide, amount: float, price: Num = None, params: dict = {}) -> Order:
+        """
+        create a trade order
+        :param str symbol: unified symbol of the market to create an order in
+        :param str type: 'market' or 'limit'
+        :param str side: 'buy' or 'sell'
+        :param float amount: how much of currency you want to trade in units of base currency
+        :param float [price]: the price at which the order is to be fulfilled, in units of the quote currency, ignored in market orders
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         market = self.market(symbol)
-        capitalizedOrderType = self.capitalize(type)
-        method = 'privatePostPlace' + capitalizedOrderType + 'Order'
-        orderType = capitalizedOrderType
+        orderType = self.capitalize(type)
         orderType += 'Offer' if (side == 'sell') else 'Bid'
-        request = self.ordered({
+        request = {
             'primaryCurrencyCode': market['baseId'],
             'secondaryCurrencyCode': market['quoteId'],
             'orderType': orderType,
-        })
+        }
+        response: dict
+        request['volume'] = amount
         if type == 'limit':
             request['price'] = price
-        request['volume'] = amount
-        response = getattr(self, method)(self.extend(request, params))
-        return {
+            response = self.privatePostPlaceLimitOrder(self.extend(request, params))
+        else:
+            response = self.privatePostPlaceMarketOrder(self.extend(request, params))
+        return self.safe_order({
             'info': response,
-            'id': response['OrderGuid'],
-        }
+            'id': self.safe_string(response, 'OrderGuid'),
+        }, market)
 
-    def cancel_order(self, id, symbol=None, params={}):
-        self.load_markets()
+    def cancel_order(self, id: str, symbol: Str = None, params: dict = {}) -> Order:
+        """
+        cancels an open order
+
+        https://www.independentreserve.com/features/api#CancelOrder
+
+        :param str id: order id
+        :param str symbol: unified symbol of the market the order was made in
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: An `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
         request = {
             'orderGuid': id,
         }
-        return self.privatePostCancelOrder(self.extend(request, params))
+        response = self.privatePostCancelOrder(self.extend(request, params))
+        #
+        #    {
+        #        "AvgPrice": 455.48,
+        #        "CreatedTimestampUtc": "2022-08-05T06:42:11.3032208Z",
+        #        "OrderGuid": "719c495c-a39e-4884-93ac-280b37245037",
+        #        "Price": 485.76,
+        #        "PrimaryCurrencyCode": "Xbt",
+        #        "ReservedAmount": 0.358,
+        #        "SecondaryCurrencyCode": "Usd",
+        #        "Status": "Cancelled",
+        #        "Type": "LimitOffer",
+        #        "VolumeFilled": 0,
+        #        "VolumeOrdered": 0.358
+        #    }
+        #
+        return self.parse_order(response)
 
-    def sign(self, path, api='public', method='GET', params={}, headers=None, body=None):
-        url = self.urls['api'][api] + '/' + path
-        if api == 'public':
-            if params:
+    def fetch_deposit_address(self, code: str, params: dict = {}) -> DepositAddress:
+        """
+        fetch the deposit address for a currency associated with self account
+
+        https://www.independentreserve.com/features/api#GetDigitalCurrencyDepositAddress
+
+        :param str code: unified currency code
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `address structure <https://docs.ccxt.com/?id=address-structure>`
+        """
+        if self.markets is None:
+            self.load_markets()
+        currency = self.currency(code)
+        request = {
+            'primaryCurrencyCode': currency['id'],
+        }
+        response = self.privatePostGetDigitalCurrencyDepositAddress(self.extend(request, params))
+        #
+        #    {
+        #        Tag: '3307446684',
+        #        DepositAddress: 'GCCQH4HACMRAD56EZZZ4TOIDQQRVNADMJ35QOFWF4B2VQGODMA2WVQ22',
+        #        LastCheckedTimestampUtc: '2024-02-20T11:13:35.6912985Z',
+        #        NextUpdateTimestampUtc: '2024-02-20T11:14:56.5112394Z'
+        #    }
+        #
+        return self.parse_deposit_address(response)
+
+    def parse_deposit_address(self, depositAddress: dict, currency: Currency = None) -> DepositAddress:
+        #
+        #    {
+        #        Tag: '3307446684',
+        #        DepositAddress: 'GCCQH4HACMRAD56EZZZ4TOIDQQRVNADMJ35QOFWF4B2VQGODMA2WVQ22',
+        #        LastCheckedTimestampUtc: '2024-02-20T11:13:35.6912985Z',
+        #        NextUpdateTimestampUtc: '2024-02-20T11:14:56.5112394Z'
+        #    }
+        #
+        address = self.safe_string(depositAddress, 'DepositAddress')
+        self.check_address(address)
+        return {
+            'info': depositAddress,
+            'currency': self.safe_string(currency, 'code'),
+            'network': None,
+            'address': address,
+            'tag': self.safe_string(depositAddress, 'Tag'),
+        }
+
+    def withdraw(self, code: str, amount: float, address: str, params: dict = {}) -> Transaction:
+        """
+        make a withdrawal
+
+        https://www.independentreserve.com/features/api#WithdrawDigitalCurrency
+
+        :param str code: unified currency code
+        :param float amount: the amount to withdraw
+        :param str address: the address to withdraw to
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param str [params.tag]: memo / destination tag, required for currencies in options['withdrawTagRequiredCurrencies']
+
+ EXCHANGE SPECIFIC PARAMETERS
+        :param dict [params.comment]: withdrawal comment, should not exceed 500 characters
+        :returns dict: a `transaction structure <https://docs.ccxt.com/?id=transaction-structure>`
+        """
+        tagWithdrawTag, paramsWithdrawTag = self.handle_param_string(params, 'tag')
+        self.check_address(address, code, tagWithdrawTag)
+        if self.markets is None:
+            self.load_markets()
+        currency = self.currency(code)
+        request = {
+            'primaryCurrencyCode': currency['id'],
+            'withdrawalAddress': address,
+            'amount': self.currency_to_precision(code, amount),
+        }
+        if tagWithdrawTag is not None:
+            request['destinationTag'] = tagWithdrawTag
+        networkCode, paramsNetworkCode = self.handle_network_code_and_params(paramsWithdrawTag)
+        if networkCode is not None:
+            raise BadRequest(self.id + ' withdraw () does not accept params["networkCode"]')
+        response = self.privatePostWithdrawDigitalCurrency(self.extend(request, paramsNetworkCode))
+        #
+        #    {
+        #        "TransactionGuid": "dc932e19-562b-4c50-821e-a73fd048b93b",
+        #        "PrimaryCurrencyCode": "Bch",
+        #        "CreatedTimestampUtc": "2020-04-01T05:26:30.5093622+00:00",
+        #        "Amount": {
+        #            "Total": 0.1231,
+        #            "Fee": 0.0001
+        #        },
+        #        "Destination": {
+        #            "Address": "bc1qhpqxkjpvgkckw530yfmxyr53c94q8f4273a7ez",
+        #            "Tag": null
+        #        },
+        #        "Status": "Pending",
+        #        "Transaction": null
+        #    }
+        #
+        return self.parse_transaction(response, currency)
+
+    def parse_transaction(self, transaction: dict, currency: Currency = None) -> Transaction:
+        #
+        #    {
+        #        "TransactionGuid": "dc932e19-562b-4c50-821e-a73fd048b93b",
+        #        "PrimaryCurrencyCode": "Bch",
+        #        "CreatedTimestampUtc": "2020-04-01T05:26:30.5093622+00:00",
+        #        "Amount": {
+        #            "Total": 0.1231,
+        #            "Fee": 0.0001
+        #        },
+        #        "Destination": {
+        #            "Address": "bc1qhpqxkjpvgkckw530yfmxyr53c94q8f4273a7ez",
+        #            "Tag": null
+        #        },
+        #        "Status": "Pending",
+        #        "Transaction": null
+        #    }
+        #
+        amount = self.safe_dict(transaction, 'Amount')
+        destination = self.safe_dict(transaction, 'Destination')
+        currencyId = self.safe_string(transaction, 'PrimaryCurrencyCode')
+        datetime = self.safe_string(transaction, 'CreatedTimestampUtc')
+        address = self.safe_string(destination, 'Address')
+        tag = self.safe_string(destination, 'Tag')
+        code = self.safe_currency_code(currencyId, currency)
+        return {
+            'info': transaction,
+            'id': self.safe_string(transaction, 'TransactionGuid'),
+            'txid': None,
+            'type': 'withdraw',
+            'currency': code,
+            'network': None,
+            'amount': self.safe_number(amount, 'Total'),
+            'status': self.safe_string(transaction, 'Status'),
+            'timestamp': self.parse8601(datetime),
+            'datetime': datetime,
+            'address': address,
+            'addressFrom': None,
+            'addressTo': address,
+            'tag': tag,
+            'tagFrom': None,
+            'tagTo': tag,
+            'updated': None,
+            'comment': None,
+            'fee': {
+                'currency': code,
+                'cost': self.safe_number(amount, 'Fee'),
+                'rate': None,
+            },
+            'internal': False,
+        }
+
+    def nonce(self) -> int:
+        # the venue accepts any strictly-increasing integer, so use milliseconds: with the second-resolution base nonce a burst of N calls would leave incrementingNonce N seconds ahead of the clock
+        return self.milliseconds()
+
+    def sign(self, path: str, api: list[str] = ['public'], method: str = 'GET', params: dict = {}) -> dict:
+        apiName = api[0]
+        apiUrl = self.safe_string(self.urls['api'], apiName)
+        if apiUrl is None:
+            raise ExchangeError(self.id + ' sign() has no API URL for self endpoint')
+        url = apiUrl + '/' + path
+        if apiName == 'public':
+            if len(params) > 0:
                 url += '?' + self.urlencode(params)
         else:
             self.check_required_credentials()
-            nonce = self.nonce()
+            # independentreserve requires an increasing nonce
+            rawNonce = self.incrementing_nonce()
+            nonce = self.parse_to_int(rawNonce)
             auth = [
                 url,
                 'apiKey=' + self.apiKey,
                 'nonce=' + str(nonce),
             ]
-            keys = list(params.keys())
+            paramsDict = self.extend({}, params)
+            keys = list(paramsDict.keys())
             for i in range(0, len(keys)):
                 key = keys[i]
-                value = str(params[key])
+                value = self.safe_string(paramsDict, key, '')
                 auth.append(key + '=' + value)
             message = ','.join(auth)
-            signature = self.hmac(self.encode(message), self.encode(self.secret))
-            query = self.ordered({})
+            signature = self.hmac(self.encode(message), self.encode(self.secret), hashlib.sha256)
+            query = {}
             query['apiKey'] = self.apiKey
             query['nonce'] = nonce
             query['signature'] = signature.upper()
             for i in range(0, len(keys)):
                 key = keys[i]
-                query[key] = params[key]
-            body = self.json(query)
-            headers = {'Content-Type': 'application/json'}
-        return {'url': url, 'method': method, 'body': body, 'headers': headers}
+                query[key] = paramsDict[key]
+            signedBody = self.json(query)
+            signedHeaders = {'Content-Type': 'application/json'}
+            return {'url': url, 'method': method, 'body': signedBody, 'headers': signedHeaders}
+        headers = {}
+        return {'url': url, 'method': method, 'body': None, 'headers': headers}

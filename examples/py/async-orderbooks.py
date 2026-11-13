@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import ccxt
 import ccxt.async_support as ccxta  # noqa: E402
 import time
@@ -12,7 +16,7 @@ sys.path.append(root + '/python')
 
 
 async def async_client(exchange, symbol):
-    client = getattr(ccxta, exchange)({'enableRateLimit': True})
+    client = getattr(ccxta, exchange)()
     await client.load_markets()
     if symbol not in client.symbols:
         raise Exception(exchange + ' does not support symbol ' + symbol)
@@ -37,7 +41,7 @@ async def multi_orderbooks(exchanges, symbol):
 if __name__ == '__main__':
 
     # Consider review request rate limit in the methods you call
-    exchanges = ["bittrex", "bitfinex", "poloniex"]
+    exchanges = ["kucoin", "bitfinex", "poloniex"]
     symbol = 'ETH/BTC'
 
-    asyncio.get_event_loop().run_until_complete(multi_orderbooks(exchanges, symbol))
+    run(multi_orderbooks(exchanges, symbol))

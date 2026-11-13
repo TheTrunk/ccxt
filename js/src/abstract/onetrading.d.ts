@@ -1,0 +1,35 @@
+import { List, Dict } from '../base/types.js';
+import { Exchange as _Exchange } from '../base/Exchange.js';
+declare abstract class Exchange extends _Exchange {
+    publicGetCurrencies(params?: {}): Promise<List>;
+    publicGetCandlesticksInstrumentCode(params?: {}): Promise<Dict>;
+    publicGetFees(params?: {}): Promise<List>;
+    publicGetInstruments(params?: {}): Promise<List>;
+    publicGetOrderBookInstrumentCode(params?: {}): Promise<Dict>;
+    publicGetMarketTicker(params?: {}): Promise<List>;
+    publicGetMarketTickerInstrumentCode(params?: {}): Promise<Dict>;
+    publicGetTime(params?: {}): Promise<Dict>;
+    publicGetFundingRate(params?: {}): Promise<List>;
+    publicGetFundingRateHistory(params?: {}): Promise<Dict>;
+    publicGetFundingRateSettings(params?: {}): Promise<List>;
+    privateGetAccountBalances(params?: {}): Promise<Dict>;
+    privateGetAccountFees(params?: {}): Promise<Dict>;
+    privateGetAccountOrders(params?: {}): Promise<Dict>;
+    privateGetAccountOrdersOrderId(params?: {}): Promise<Dict>;
+    privateGetAccountOrdersClientClientId(params?: {}): Promise<Dict>;
+    privateGetAccountOrdersOrderIdTrades(params?: {}): Promise<Dict>;
+    privateGetAccountTrades(params?: {}): Promise<Dict>;
+    privateGetAccountTradeTradeId(params?: {}): Promise<Dict>;
+    privateGetAccountFuturesSummary(params?: {}): Promise<Dict>;
+    privateGetAccountFuturesPositions(params?: {}): Promise<Dict>;
+    privateGetAccountFuturesPositionsHistory(params?: {}): Promise<Dict>;
+    privateGetAccountFuturesPositionsPositionIdTrades(params?: {}): Promise<Dict>;
+    privateGetAccountFuturesPositionsPositionIdFundingPayments(params?: {}): Promise<Dict>;
+    privateGetAccountFuturesFundingPayments(params?: {}): Promise<Dict>;
+    privatePostAccountOrders(params?: {}): Promise<Dict>;
+    privatePostSubaccountsTransfers(params?: {}): Promise<Dict>;
+    privateDeleteAccountOrders(params?: {}): Promise<List>;
+    privateDeleteAccountOrdersOrderId(params?: {}): Promise<Dict>;
+    privateDeleteAccountOrdersClientClientId(params?: {}): Promise<Dict>;
+}
+export default Exchange;

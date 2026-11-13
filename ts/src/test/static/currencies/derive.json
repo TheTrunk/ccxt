@@ -1,0 +1,634 @@
+{
+  "BTC": {
+    "info": {
+      "currency": "BTC",
+      "market_type": "ALL",
+      "spot_price": "84213.86540978492",
+      "spot_price_24h": "83968.83857964512",
+      "managers": [
+        {
+          "risk_universe_id": 1,
+          "risk_universe_name": "PRIME",
+          "sm": 1,
+          "pm": 5
+        }
+      ],
+      "option": {
+        "name": "BTC-OPTION",
+        "address": "0xd0711b9eBE84b778483709CDe62BacFDBAE13623",
+        "universes": [
+          {
+            "risk_universe_id": 1,
+            "risk_universe_name": "PRIME",
+            "oi": {
+              "current_open_interest": "6486.745010644765",
+              "interest_cap": "300000"
+            }
+          }
+        ]
+      },
+      "perp": {
+        "name": "BTC-PERP",
+        "address": "0xDBa83C0C654DB1cd914FA2710bA743e925B53086",
+        "universes": [
+          {
+            "risk_universe_id": 1,
+            "risk_universe_name": "PRIME",
+            "oi": {
+              "current_open_interest": "290.264620426457",
+              "interest_cap": "36000"
+            },
+            "srm_perp_margin_requirements": {
+              "im_perp_req": "0.066",
+              "mm_perp_req": "0.05",
+              "max_leverage": "15.15"
+            }
+          }
+        ]
+      },
+      "spot": []
+    },
+    "id": "BTC",
+    "numericId": null,
+    "code": "BTC",
+    "precision": null,
+    "type": null,
+    "name": null,
+    "active": null,
+    "deposit": null,
+    "withdraw": null,
+    "fee": null,
+    "fees": {},
+    "networks": null,
+    "limits": {
+      "deposit": {
+        "min": null,
+        "max": null
+      },
+      "withdraw": {
+        "min": null,
+        "max": null
+      }
+    }
+  },
+  "USDT": {
+    "info": {
+      "currency": "USDT",
+      "instrument_types": [
+        "erc20"
+      ],
+      "protocol_asset_addresses": {
+        "perp": null,
+        "option": null,
+        "spot": "0x5E72430EC945CCc183c34e2860FFC2b5bac712c2",
+        "underlying_erc20": "0x954bE1803546150bfd887c9ff70fd221F2F505d3"
+      },
+      "managers": [
+        {
+          "address": "0x28c9ddF9A3B29c2E6a561c1BC520954e5A33de5D",
+          "margin_type": "SM",
+          "currency": null
+        },
+        {
+          "address": "0xF728557D1129196cc43de5a6ec61fBf5d105db95",
+          "margin_type": "PM2",
+          "currency": "SOL"
+        },
+        {
+          "address": "0x18b385853a605a9B37E181919D3808C739729347",
+          "margin_type": "PM2",
+          "currency": "HYPE"
+        },
+        {
+          "address": "0xC7adAB7A2b92019098dA55Ba4C5A8C65Ae7e52DC",
+          "margin_type": "PM2",
+          "currency": "BTC"
+        },
+        {
+          "address": "0xc755DAe3fd295A687adf3e192387163f813F0598",
+          "margin_type": "PM2",
+          "currency": "ETH"
+        }
+      ],
+      "srm_im_discount": "0.95941999999999998260946654227154795080423355102539",
+      "srm_mm_discount": "0.98",
+      "pm2_collateral_discounts": [
+        {
+          "manager_currency": "SOL",
+          "im_discount": "0.020000000000000000416333634234433702658861875534058",
+          "mm_discount": "0.020000000000000000416333634234433702658861875534058"
+        },
+        {
+          "manager_currency": "HYPE",
+          "im_discount": "0.020000000000000000416333634234433702658861875534058",
+          "mm_discount": "0.020000000000000000416333634234433702658861875534058"
+        },
+        {
+          "manager_currency": "BTC",
+          "im_discount": "0.020000000000000000416333634234433702658861875534058",
+          "mm_discount": "0.020000000000000000416333634234433702658861875534058"
+        },
+        {
+          "manager_currency": "ETH",
+          "im_discount": "0.020000000000000000416333634234433702658861875534058",
+          "mm_discount": "0.020000000000000000416333634234433702658861875534058"
+        }
+      ],
+      "borrow_apy": "0",
+      "supply_apy": "0",
+      "total_borrow": "0",
+      "total_supply": "1957738.9858",
+      "asset_cap_and_supply_per_manager": {
+        "erc20": {
+          "PM2": [
+            {
+              "current_open_interest": "0",
+              "interest_cap": "0",
+              "manager_currency": "ADA"
+            },
+            {
+              "current_open_interest": "95538.9978",
+              "interest_cap": "10000000",
+              "manager_currency": "BTC"
+            },
+            {
+              "current_open_interest": "10196.5718",
+              "interest_cap": "10000000",
+              "manager_currency": "ETH"
+            },
+            {
+              "current_open_interest": "0",
+              "interest_cap": "10000000",
+              "manager_currency": "HYPE"
+            },
+            {
+              "current_open_interest": "0",
+              "interest_cap": "10000000",
+              "manager_currency": "SOL"
+            }
+          ],
+          "SM": [
+            {
+              "current_open_interest": "1852003.4162",
+              "interest_cap": "10000000",
+              "manager_currency": null
+            }
+          ]
+        },
+        "perp": {},
+        "option": {}
+      },
+      "market_type": "SRM_BASE_ONLY",
+      "spot_price": "0.9994880195",
+      "spot_price_24h": "0.9990331061",
+      "erc20_details": {
+        "sub_id": "0",
+        "decimals": 6
+      },
+      "srm_perp_margin_requirements": {
+        "mm_perp_req": "0",
+        "im_perp_req": "0",
+        "max_leverage": "0"
+      }
+    },
+    "id": "USDT",
+    "numericId": null,
+    "code": "USDT",
+    "precision": null,
+    "type": null,
+    "name": null,
+    "active": null,
+    "deposit": null,
+    "withdraw": null,
+    "fee": null,
+    "fees": {},
+    "networks": null,
+    "limits": {
+      "deposit": {
+        "min": null,
+        "max": null
+      },
+      "withdraw": {
+        "min": null,
+        "max": null
+      }
+    }
+  },
+  "USDC": {
+    "info": {
+      "currency": "USDC",
+      "market_type": "SRM_BASE_ONLY",
+      "spot_price": "0.9999424931420163",
+      "spot_price_24h": "0.9999385308706913",
+      "managers": [
+        {
+          "risk_universe_id": 0,
+          "sm": 0
+        },
+        {
+          "risk_universe_id": 1,
+          "risk_universe_name": "PRIME",
+          "sm": 1,
+          "pm": 5
+        },
+        {
+          "risk_universe_id": 2,
+          "risk_universe_name": "MIDCAP",
+          "sm": 2,
+          "pm": 6
+        },
+        {
+          "risk_universe_id": 3,
+          "risk_universe_name": "ALT",
+          "sm": 3,
+          "pm": 7
+        },
+        {
+          "risk_universe_id": 4,
+          "risk_universe_name": "RWA",
+          "sm": 4,
+          "pm": 8
+        }
+      ],
+      "spot": [
+        {
+          "name": "USDC",
+          "address": "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
+          "erc20": {
+            "decimals": 6,
+            "underlying_erc20": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+          },
+          "min_deposit_usd": "5",
+          "universes": [
+            {
+              "risk_universe_id": 1,
+              "srm_im_discount": "1",
+              "srm_mm_discount": "1",
+              "pm2_im_discount": "0",
+              "pm2_mm_discount": "0",
+              "lending": {
+                "borrow_apy": "0.57070206888",
+                "supply_apy": "0.490411931981",
+                "total_borrow": "61855014.311910892306",
+                "total_borrow_cap": "340282366920938463463374607.431768211455"
+              },
+              "oi": {
+                "current_open_interest": "68382808.858216278594",
+                "interest_cap": "340282366920938463463374607.431768211455"
+              }
+            },
+            {
+              "risk_universe_id": 2,
+              "srm_im_discount": "1",
+              "srm_mm_discount": "1",
+              "pm2_im_discount": "0",
+              "pm2_mm_discount": "0",
+              "lending": {
+                "borrow_apy": "0.03531691236",
+                "supply_apy": "0.01974867265",
+                "total_borrow": "11062333.996941642466",
+                "total_borrow_cap": "340282366920938463463374607.431768211455"
+              },
+              "oi": {
+                "current_open_interest": "18793825.429597159731",
+                "interest_cap": "340282366920938463463374607.431768211455"
+              }
+            },
+            {
+              "risk_universe_id": 3,
+              "srm_im_discount": "1",
+              "srm_mm_discount": "1",
+              "pm2_im_discount": "0",
+              "pm2_mm_discount": "0",
+              "lending": {
+                "borrow_apy": "0.00504373644",
+                "supply_apy": "0.000402788942",
+                "total_borrow": "1093492.940611772463",
+                "total_borrow_cap": "340282366920938463463374607.431768211455"
+              },
+              "oi": {
+                "current_open_interest": "13008116.971166681225",
+                "interest_cap": "340282366920938463463374607.431768211455"
+              }
+            },
+            {
+              "risk_universe_id": 4,
+              "srm_im_discount": "1",
+              "srm_mm_discount": "1",
+              "pm2_im_discount": "0",
+              "pm2_mm_discount": "0",
+              "lending": {
+                "borrow_apy": "0.0084338214",
+                "supply_apy": "0.001126214962",
+                "total_borrow": "209502.792024381036",
+                "total_borrow_cap": "340282366920938463463374607.431768211455"
+              },
+              "oi": {
+                "current_open_interest": "1490446.965756139371",
+                "interest_cap": "340282366920938463463374607.431768211455"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "id": "USDC",
+    "numericId": null,
+    "code": "USDC",
+    "precision": null,
+    "type": null,
+    "name": null,
+    "active": null,
+    "deposit": null,
+    "withdraw": null,
+    "fee": null,
+    "fees": {},
+    "networks": null,
+    "limits": {
+      "deposit": {
+        "min": null,
+        "max": null
+      },
+      "withdraw": {
+        "min": null,
+        "max": null
+      }
+    }
+  },
+  "LBTC": {
+    "info": {
+      "currency": "LBTC",
+      "instrument_types": [
+        "erc20"
+      ],
+      "protocol_asset_addresses": {
+        "perp": null,
+        "option": null,
+        "spot": "0xeaF03Bb3280C609d35E7F84d24a996c7C0b74F5f",
+        "underlying_erc20": "0x36b5C126A3D7B25F6032653A0d18823Ee48a890e"
+      },
+      "managers": [
+        {
+          "address": "0x28c9ddF9A3B29c2E6a561c1BC520954e5A33de5D",
+          "margin_type": "SM",
+          "currency": null
+        },
+        {
+          "address": "0xC7adAB7A2b92019098dA55Ba4C5A8C65Ae7e52DC",
+          "margin_type": "PM2",
+          "currency": "BTC"
+        },
+        {
+          "address": "0xc755DAe3fd295A687adf3e192387163f813F0598",
+          "margin_type": "PM2",
+          "currency": "ETH"
+        }
+      ],
+      "srm_im_discount": "0.59499999999999996225241716274467762559652328491211",
+      "srm_mm_discount": "0.7",
+      "pm2_collateral_discounts": [
+        {
+          "manager_currency": "BTC",
+          "im_discount": "0.018999999999999999528155214534308470319956541061401",
+          "mm_discount": "0.15599999999999999977795539507496869191527366638184"
+        },
+        {
+          "manager_currency": "ETH",
+          "im_discount": "0.049000000000000001887379141862766118720173835754395",
+          "mm_discount": "0.2999999999999999888977697537484345957636833190918"
+        }
+      ],
+      "borrow_apy": "0",
+      "supply_apy": "0",
+      "total_borrow": "0",
+      "total_supply": "125.6056",
+      "asset_cap_and_supply_per_manager": {
+        "erc20": {
+          "PM2": [
+            {
+              "current_open_interest": "0",
+              "interest_cap": "0",
+              "manager_currency": "ADA"
+            },
+            {
+              "current_open_interest": "0.1693",
+              "interest_cap": "10",
+              "manager_currency": "BTC"
+            },
+            {
+              "current_open_interest": "0",
+              "interest_cap": "0.01",
+              "manager_currency": "ETH"
+            },
+            {
+              "current_open_interest": "0",
+              "interest_cap": "0",
+              "manager_currency": "HYPE"
+            },
+            {
+              "current_open_interest": "0",
+              "interest_cap": "0",
+              "manager_currency": "SOL"
+            }
+          ],
+          "SM": [
+            {
+              "current_open_interest": "125.4363",
+              "interest_cap": "150",
+              "manager_currency": null
+            }
+          ]
+        },
+        "perp": {},
+        "option": {}
+      },
+      "market_type": "SRM_BASE_ONLY",
+      "spot_price": "73646.01927777664",
+      "spot_price_24h": "74234.25844646309",
+      "erc20_details": {
+        "sub_id": "0",
+        "decimals": 8
+      },
+      "srm_perp_margin_requirements": {
+        "mm_perp_req": "0",
+        "im_perp_req": "0",
+        "max_leverage": "0"
+      }
+    },
+    "id": "LBTC",
+    "numericId": null,
+    "code": "LBTC",
+    "precision": null,
+    "type": null,
+    "name": null,
+    "active": null,
+    "deposit": null,
+    "withdraw": null,
+    "fee": null,
+    "fees": {},
+    "networks": null,
+    "limits": {
+      "deposit": {
+        "min": null,
+        "max": null
+      },
+      "withdraw": {
+        "min": null,
+        "max": null
+      }
+    }
+  },
+
+    "ETH": {
+        "info": {
+            "currency": "ETH",
+            "market_type": "ALL",
+            "spot_price": "2681.4703630032486",
+            "spot_price_24h": "2696.862435358125",
+            "managers": [
+                {
+                    "risk_universe_id": 1,
+                    "risk_universe_name": "PRIME",
+                    "sm": 1,
+                    "pm": 5
+                },
+                {
+                    "risk_universe_id": 2,
+                    "risk_universe_name": "MIDCAP",
+                    "sm": 2
+                },
+                {
+                    "risk_universe_id": 3,
+                    "risk_universe_name": "ALT",
+                    "sm": 3
+                },
+                {
+                    "risk_universe_id": 4,
+                    "risk_universe_name": "RWA",
+                    "sm": 4
+                }
+            ],
+            "option": {
+                "name": "ETH-OPTION",
+                "address": "0x4BB4C3CDc7562f08e9910A0C7D8bB7e108861eB4",
+                "universes": [
+                    {
+                        "risk_universe_id": 1,
+                        "risk_universe_name": "PRIME",
+                        "oi": {
+                            "current_open_interest": "305417.723502152879",
+                            "interest_cap": "6000000"
+                        }
+                    }
+                ]
+            },
+            "perp": {
+                "name": "ETH-PERP",
+                "address": "0xAf65752C4643E25C02F693f9D4FE19cF23a095E3",
+                "universes": [
+                    {
+                        "risk_universe_id": 1,
+                        "risk_universe_name": "PRIME",
+                        "oi": {
+                            "current_open_interest": "15135.166442960228",
+                            "interest_cap": "750000"
+                        },
+                        "srm_perp_margin_requirements": {
+                            "im_perp_req": "0.066",
+                            "mm_perp_req": "0.05",
+                            "max_leverage": "15.15"
+                        }
+                    }
+                ]
+            },
+            "spot": [
+                {
+                    "name": "ETH",
+                    "address": "0xE201fCEfD4852f96810C069f66560dc25B2C7A55",
+                    "erc20": {
+                        "decimals": 18,
+                        "underlying_erc20": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                    },
+                    "min_deposit_usd": "5",
+                    "universes": [
+                        {
+                            "risk_universe_id": 1,
+                            "srm_im_discount": "0.75",
+                            "srm_mm_discount": "0.8",
+                            "pm2_im_discount": "0.07",
+                            "pm2_mm_discount": "0.06",
+                            "lending": {
+                                "borrow_apy": "0",
+                                "supply_apy": "0",
+                                "total_borrow": "0",
+                                "total_borrow_cap": "0"
+                            },
+                            "oi": {
+                                "current_open_interest": "8758.148405783542",
+                                "interest_cap": "32000"
+                            }
+                        },
+                        {
+                            "risk_universe_id": 2,
+                            "srm_im_discount": "0.75",
+                            "srm_mm_discount": "0.8",
+                            "pm2_im_discount": "0.23",
+                            "pm2_mm_discount": "0.188",
+                            "lending": {
+                                "borrow_apy": "0",
+                                "supply_apy": "0",
+                                "total_borrow": "0",
+                                "total_borrow_cap": "0"
+                            },
+                            "oi": {
+                                "current_open_interest": "150.667478322175",
+                                "interest_cap": "32000"
+                            }
+                        },
+                        {
+                            "risk_universe_id": 3,
+                            "srm_im_discount": "0.75",
+                            "srm_mm_discount": "0.8",
+                            "pm2_im_discount": "0.23",
+                            "pm2_mm_discount": "0.188",
+                            "lending": {
+                                "borrow_apy": "0",
+                                "supply_apy": "0",
+                                "total_borrow": "0",
+                                "total_borrow_cap": "0"
+                            },
+                            "oi": {
+                                "current_open_interest": "86.827891636145",
+                                "interest_cap": "32000"
+                            }
+                        },
+                        {
+                            "risk_universe_id": 4,
+                            "srm_im_discount": "0.75",
+                            "srm_mm_discount": "0.8",
+                            "pm2_im_discount": "0.23",
+                            "pm2_mm_discount": "0.188",
+                            "lending": {
+                                "borrow_apy": "0",
+                                "supply_apy": "0",
+                                "total_borrow": "0",
+                                "total_borrow_cap": "0"
+                            },
+                            "oi": {
+                                "current_open_interest": "40.912156538019",
+                                "interest_cap": "32000"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        "id": "ETH",
+        "code": "ETH",
+        "fees": {},
+        "limits": {
+            "deposit": {},
+            "withdraw": {}
+        }
+    }
+}

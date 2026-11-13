@@ -1,38 +1,16 @@
 # Contributing To The CCXT Library
 
-```diff
-- This file is a work in progress, guidelines for contributing are being developed right now!
-```
+- [How To Submit A Question Or Issue](#how-to-submit-an-issue)
+- [How To Contribute Code](#how-to-contribute-code)
+  - [What You Need To Have](#what-you-need-to-have)
+  - [What You Need To Know](#what-you-need-to-know)
 
 ## How To Submit An Issue
 
-If you want to submit an issue and you want your issue to be resolved quickly, here's a checklist for you:
+Read the notes when opening a [new issue on github](https://github.com/ccxt/ccxt/issues/new/choose) and provide the requested details, so we can assist you better. You can also read the [Troubleshooting](https://github.com/ccxt/ccxt/wiki/Manual#troubleshooting) section.
 
-- Read the [Manual](https://github.com/ccxt/ccxt/wiki/Manual), and especially carefully read the following sections:
-  - [Exchange Properties](https://github.com/ccxt/ccxt/wiki/Manual#exchange-properties)
-  - [Rate Limit](https://github.com/ccxt/ccxt/wiki/Manual#rate-limit)
-  - [DDoS Protection](https://github.com/ccxt/ccxt/wiki/Manual#ddos-protection-by-cloudflare--incapsula)
-  - [Authentication](https://github.com/ccxt/ccxt/wiki/Manual#authentication)
-  - [API Keys Setup](https://github.com/ccxt/ccxt/wiki/Manual#api-keys-setup)
-- Read the [Troubleshooting](https://github.com/ccxt/ccxt/wiki/Manual#troubleshooting) section and follow troubleshooting steps.
-- Read the [FAQ](https://github.com/ccxt/ccxt/wiki/FAQ) for most frequently asked questions.
-- Read the [API docs](https://github.com/ccxt/ccxt/wiki/Exchange-Markets) for your exchange.
-- Search for similar issues first to avoid duplicates.
-- If your issue is unique, along with a basic description of the failure, the following **IS REQUIRED**:
-  - **set `exchange.verbose = true` property on the exchange instance before calling its functions or methods**
-  - **DON'T POST SCREENSHOTS OF CODE OR ERRORS, POST THE OUTPUT AND CODE IN PLAIN TEXT!**
-  - **surround code and output with triple backticks: &#096;&#096;&#096;GOOD&#096;&#096;&#096;**
-  - don't confuse the backtick symbol (&#096;) with the quote symbol (\'): '''BAD'''
-  - don't confuse a single backtick with triple backticks: &#096;BAD&#096;
-  - paste a complete code snippet you're having difficulties with, avoid one-liners
-  - paste the **full verbose output** of the failing method without your keys
-  - the verbose output should include the request and response from the exchange (not just an error callstack)
-  - write your language **and version**
-  - write ccxt library version
-  - which exchange it is
-  - which method you're trying to call
 
-## Reporting Vulnerabilities And Critical Issues
+### Reporting Vulnerabilities And Critical Issues
 
 If you found a security issue or a critical vulnerability and reporting it in public would impose risk – please feel free to send us a message to <a href="mailto:info@ccxt.trade">info@ccxt.trade</a>.
 
@@ -40,14 +18,17 @@ If you found a security issue or a critical vulnerability and reporting it in pu
 
 - **[MAKE SURE YOUR CODE IS UNIFIED](https://github.com/ccxt/ccxt/blob/master/CONTRIBUTING.md#derived-exchange-classes)!**
 
-  ↑ This is the most important rule of all.
+  **↑ This is the most important rule of all!!!**
+
+- **BEFORE ANY PUSH MAKE SURE YOU RUN THIS COMMAND LOCALLY: `git config core.hooksPath .git-templates/hooks`**
 
 - **PLEASE, DO NOT COMMIT THE FOLLOWING FILES IN PULL REQUESTS:**
 
-  - `/doc/*` (these files are generated from `/wiki/*`, place your edits there)
   - `/build/*` (these are generated automatically)
+  - `/js/*` (these are compiled from the typescript version)
   - `/php/*` (except for base classes)
   - `/python/*` (except for base classes)
+  - `/cs/*` (except for base classes)
   - `/ccxt.js`
   - `/README.md` (exchange lists are generated automatically)
   - `/package.json`
@@ -93,9 +74,49 @@ The following is a set of rules for contributing to the ccxt library codebase.
 
 ## What You Need To Have
 
-The easiest way is to use Docker to run an isolated build & test enviroment with all the dependencies installed:
+If you're not going to develop CCXT and contribute code to the CCXT library, then you don't need the Docker image nor the CCXT repository. If you just want to use CCXT inside your project simply install it as a regular package into the project folder as documented in the Manual (https://github.com/ccxt/ccxt/wiki/Install):
 
-```
+- [JavaScript / Node.js / NPM](https://github.com/ccxt/ccxt/wiki/Install#javascript-npm)
+
+  ```shell
+  # JavaScript / Node.js / NPM
+  npm install ccxt
+  ```
+
+- [Python / PIP](https://github.com/ccxt/ccxt/wiki/Install#python)
+
+  ```shell
+  # Python
+  pip install ccxt  # or pip3 install ccxt
+  ```
+
+- [PHP / Composer](https://github.com/ccxt/ccxt/wiki/Install#php)
+
+  ```shell
+  # PHP / Composer
+  composer install ccxt
+  ```
+
+- [C# / Nugget](https://github.com/ccxt/ccxt/wiki/Install#netc)
+
+  ```shell
+  # C# / Nugget
+  dotnet add ccxt
+  ```
+
+- [Java / Gradle](https://github.com/ccxt/ccxt/wiki/Install#java)
+
+  ```shell
+  # Java (clone and build from source)
+  git clone https://github.com/ccxt/ccxt.git --depth 1
+  cd ccxt/java && ./gradlew :lib:build
+  ```
+
+### With Docker
+
+The easiest way is to use Docker to run an isolated build & test environment with all the dependencies installed:
+
+```shell
 docker-compose run --rm ccxt
 ```
 
@@ -105,20 +126,46 @@ The CCXT folder is mapped inside of the container, except the `node_modules` fol
 
 This way you can keep the build tools and processes isolated, not having to work through the painful process of installing all those dependencies to your host machine manually.
 
-If you choose the hard way, here is the list of the dependencies you will need. It may be incomplete and outdated, so you may want to look into the [`Dockerfile`](https://github.com/ccxt/ccxt/blob/master/Dockerfile) and [`.travis.yml`](https://github.com/ccxt/ccxt/blob/master/.travis.yml) scripts for the list of commands we use to install the state-of-the-art dependencies needed to build and test CCXT.
+### Without Docker
 
+#### Dependencies
+
+- Git
 - [Node.js](https://nodejs.org/en/download/) 8+
 - [Python](https://www.python.org/downloads/) 3.5.3+
-  - tox (`brew install tox` or `pip install tox`)
   - requests (`pip install requests`)
-  - aiohttp (`pip install aiohttp`)
-- [PHP](https://secure.php.net/downloads.php) 5.3+ with the following extensions installed and enabled:
+  - [aiohttp](https://docs.aiohttp.org/) (`pip install aiohttp`)
+  - [ruff](https://docs.astral.sh/ruff/) (`pip install ruff`)
+  - [tox](https://tox.readthedocs.io)
+    - via pip: `pip install tox`
+    - MacOS with [brew](https://brew.sh): `brew install tox`
+    - Ubuntu Linux: `apt-get install tox`
+- [PHP](https://secure.php.net/downloads.php) 8.1+ with the following extensions installed and enabled:
   - cURL
   - iconv
   - mbstring
   - PCRE
-  - bcmath (php<7.1)
-- [Pandoc](https://pandoc.org/installing.html) 1.19+
+  - gmp
+- [C#](https://dotnet.microsoft.com/en-us/download) 7.0
+- [Java](https://adoptium.net/) 21+ with Gradle
+
+#### Build Steps
+
+```shell
+git clone https://github.com/ccxt/ccxt.git
+```
+
+```shell
+cd ccxt
+```
+
+```shell
+npm install
+```
+
+```shell
+npm run build
+```
 
 ## What You Need To Know
 
@@ -139,53 +186,82 @@ The contents of the repository are structured as follows:
 /README.md                 # master markdown for GitHub, npmjs.com, npms.io, yarn and others
 /build/                    # build scripts
 /build/export-exchanges.js # used to create tables of exchanges in the docs during the build
-/build/transpile.js        # the transpilation script
+/build/transpile.ts        # the transpilation script
 /build/update-badges.js    # a JS script to update badges in the README and in docs
 /build/vss.js              # reads single-sourced version from package.json and writes it everywhere
 /dist/                     # a folder for the generated browser bundle of CCXT
 /ccxt.js                   # entry point for the master JS version of the ccxt library
 /ccxt.php                  # entry point for the PHP version of the ccxt library
-/doc/                      # Sphinx-generated rst-docs for http://ccxt.readthedocs.io/
 /js/                       # the JS version of the library
+/ts/                       # the TypeScript version of the library
 /php/                      # PHP ccxt module/package folder
+/cs/                       # C#/dotnet package folder
 /python/                   # Python ccxt module/package folder for PyPI
 /python/__init__.py        # entry point for the Python version of the ccxt.library
-/python/async/__init__.py  # asynchronous version of the ccxt.library for Python 3.5.3+ asyncio
+/python/async_support/     # asynchronous version of the ccxt.library for Python 3.5.3+ asyncio
 /python/base/              # base code for the Python version of the ccxt library
-/python/MANIFEST.in        # a PyPI-package file listing extra package files (license, configs, etc...)
-/python/README.rst         # generated reStructuredText for PyPI
-/python/setup.cfg          # wheels config file for the Python package
-/python/setup.py           # pip/setuptools script (build/install) for ccxt in Python
+/python/README.md          # a copy of README.md for PyPI
 /python/tox.ini            # tox config for Python
 /examples/                 # self-explanatory
 /examples/js               # ...
 /examples/php              # ...
 /examples/py               # ...
+/java/examples/            # Java examples (Gradle module)
 /exchanges.cfg             # custom bundle config for including only the exchanges you need
-/package.json              # npm package file, also used in setup.py for version single-sourcing
-/run-tests.js              # a front-end to run invididual tests of all exchanges in all languages (JS/PHP/Python)
+/package.json              # npm package file, version single-sourced into pyproject.toml and other files via `npm run vss`
+/pyproject.toml            # metadata and build config (pip/setuptools) for the ccxt package in Python
+/run-tests.js              # a front-end to run individual tests of all exchanges in all languages (JS/PHP/Python)
 /wiki/                     # the source of all docs (edits go here)
 ```
 
 ### Multilanguage Support
 
-The ccxt library is available in three different languages (more to come). We encourage developers to design *portable* code, so that a single-language user could read the code in other languages and understand it easily. This helps the adoption of the library. The main goal is to provide a generalized, unified, consistent and robust interface to as many existing cryptocurrency exchanges as possible.
+The ccxt library is available in several different languages (TypeScript, JavaScript, Python, PHP, C#, Go, Java and Rust). We encourage developers to design *portable* code, so that a single-language user could read the code in other languages and understand it easily. This helps the adoption of the library. The main goal is to provide a generalized, unified, consistent and robust interface to as many existing cryptocurrency exchanges as possible.
 
-At first, all language-specific versions were developed in parallel, but separately from each other. But when it became too hard to maintain and keep the code consistent among all supported languages we have decided to switch to what we call a *source/generated* process. There is now a single source version in one language, that is JavaScript. Other language-specific versions are syntactically derived (transpiled, generated) automatically from the source version. But it doesn't mean that you have to be a JS coder to contribute. The portability principle allows Python and PHP devs to effectively participate in developing the source version as well.
+At first, all language-specific versions were developed in parallel, but separately from each other. But when it became too hard to maintain and keep the code consistent among all supported languages we have decided to switch to what we call a *source/generated* process. There is now a single source version in one language, that is TypeScript. Other language-specific versions are syntactically derived (transpiled, generated) automatically from the source version. But it doesn't mean that you have to be a TS or a JS coder to contribute. The portability principle allows Python and PHP devs to effectively participate in developing the source version as well.
 
 The module entry points are:
 - `./python/__init__.py` for the Python pip package
-- `./python/async/__init__.py` for the Python 3.5.3+ ccxt.async_support subpackage
-- `./ccxt.js` for the Node.js npm package
+- `./python/async/__init__.py` for the Python 3.7.0+ ccxt.async_support subpackage
+- `./js/ccxt.js` for the Node.js npm package
+- `./ts/ccxt.ts` for TypeScript
 - `./dist/ccxt.browser.js` for the browser bundle
 - `./ccxt.php` for PHP
+- `./java/lib/src/main/java/io/github/ccxt/` for Java
 
-Generated versions and docs are transpiled from the source `ccxt.js` file and files in `./js/` by the `npm run build` command.
+Generated versions and docs are transpiled from the source `ts/src` folder by the `npm run build` command.
+
+### Base WS Runtime Changes Require Their Mirrors
+
+The files under `ts/src/base/ws/` (caches, orderbooks, futures, client plumbing) are **not** transpiled - each language carries a hand-written mirror:
+
+| ts source | mirrors |
+|---|---|
+| `ts/src/base/ws/Cache.ts` | `python/ccxt/async_support/base/ws/cache.py`, `php/pro/ArrayCache*.php`, `cs/ccxt/ws/ArrayCache.cs`, `go/v4/exchange_cache.go`, `java/lib/src/main/java/io/github/ccxt/ws/ArrayCache.java` |
+| `ts/src/base/ws/OrderBook.ts` + `OrderBookSide.ts` | `python/ccxt/async_support/base/ws/order_book*.py`, `php/pro/OrderBook*.php` + `Asks/Bids`, `cs/ccxt/ws/OrderBook*.cs`, `go/v4/exchange_ws_orderbook*.go`, `java/lib/src/main/java/io/github/ccxt/ws/*OrderBook*.java` |
+| `ts/src/base/ws/Future.ts` / `Client.ts` | the per-language `Future` / client files (`php/pro/Future.php`, `php/pro/ClientTrait.php`, `cs/ccxt/ws/Future.cs`, ...) |
+
+Two rules:
+
+1. **A PR that changes base WS behavior in ts must change the mirrors in the same PR.** The shared base ws tests (`ts/src/pro/test/base/*.ts`) are regenerated per language on every CI run, so a ts-only behavioral merge ships assertions the other runtimes cannot satisfy and breaks every subsequent PR's build gates. Genuinely non-behavioral ts changes (comments, type annotations, formatting) are exempt - say so in the PR description.
+
+2. **Native (non-transpiled) base WS tests state ts-derived expectations only.** Write expected values by reading the ts source or running the shared js test - never by running the local implementation and recording what it produces. A mirror bug must never certify itself.
 
 ### Transpiled (generated) files
 
-- All derived exchange classes are transpiled automatically from source JS files. The source files are language-agnostic, easily mapped line-to-line to any other language and written in a cross-language-compatible way. Any coder can read it (by design).
-- All base classes are **not** transpiled, those are language-specific.
+- All derived exchange classes are transpiled by `tsc` from TypeScript to JavaScript and by our custom transpiler from TypeScript to PHP and Python. The source files are language-agnostic, easily mapped line-to-line to any other language and written in a cross-language-compatible way. Any coder can read it (by design).
+- Base classes are **not** entirely transpiled and are only transpiled partially, as they are language-specific.
+
+#### Base types
+
+The base type declarations are generated from `ts/src/base/types.ts` by `npm run transpile-types`:
+
+- `python/ccxt/base/types.py`
+- `cs/ccxt/base/Exchange.Types.cs`, `cs/ccxt/base/PredictionTypes.cs`
+- `go/v4/exchange_types.go`
+- `java/lib/src/main/java/io/github/ccxt/types/*.java`
+
+Do not edit them by hand — edit `ts/src/base/types.ts` and regenerate. `npm run transpile-types-check` fails the build when they are out of sync. PHP needs no type file (unified structures are plain associative arrays) and the JS/TS declarations are emitted by `tsc`.
 
 #### JavaScript
 
@@ -193,30 +269,52 @@ The `ccxt.browser.js` is generated with Babel from source.
 
 #### Python
 
-These files containing derived exchange classes are transpiled from JS into Python:
+These files containing derived exchange classes are transpiled from TS into Python:
 
-- `js/[_a-z].js` → `python/ccxt/async/[_a-z].py`
-- `python/ccxt/async[_a-z].py` → `python/ccxt/[_a-z].py` (Python 3 asyncio → Python 2 sync transpilation stage)
-- `python/test/test_async.py` → `python/test/test.py` (the sync test is generated from the async test)
+- `ts/[_a-z].ts` → `python/ccxt/async/[_a-z].py`
+- `python/ccxt/async[_a-z].py` → `python/ccxt/[_a-z].py` (Python 3 asyncio → Python sync transpilation stage)
+- `python/ccxt/test/test_async.py` → `python/ccxt/test/test_sync.py` (the sync test is generated from the async test)
 
 These Python base classes and files are not transpiled:
 
-- `python/ccxt/base/*`
+- `python/ccxt/base/*` (except `types.py`, see [Base types](#base-types))
 - `python/ccxt/async/base/*`
 
 #### PHP
 
-These files containing derived exchange classes are transpiled from JS into PHP:
+These files containing derived exchange classes are transpiled from TS into C#:
 
-- `js/[_a-z].js` → `php/[_a-z].php`
+- `ts/[_a-z].ts` → `php/[_a-z].php`
 
 These PHP base classes and files are not transpiled:
 
-- `php/base/*`
+- `php/Exchange.php php/ExchangeError.php php/Precise.php ...`
+
+#### C#
+
+These files containing derived exchange classes are transpiled from TS into C#:
+
+- `ts/src/[_a-z].ts` → `cs/src/exchanges/[_a-z].cs`
+
+These C# base classes and files are not transpiled:
+
+- `cs/base/*`
+
+#### Java
+
+These files containing derived exchange classes are transpiled from TS into Java:
+
+- `ts/src/[_a-z].ts` → `java/lib/src/main/java/io/github/ccxt/exchanges/[A-Z]*.java`
+
+These Java base classes and files are not transpiled:
+
+- `java/lib/src/main/java/io/github/ccxt/base/*`
+- `java/lib/src/main/java/io/github/ccxt/ws/*`
+- `java/lib/src/main/java/io/github/ccxt/Exchange.java`
 
 #### Typescript
 
-- `js/[_a-z].js` → `ccxt.d.ts`
+- Development is made using these files
 
 ### Base Class
 
@@ -232,7 +330,7 @@ Below are key notes on how to keep the JS code transpileable.
 Use the linter `npm run lint js/your-exchange-implementation.js` before you build. It will cover many (but not all) the issues,
 so manual checking will still be required if transpilation fails.
 
-If you see a `[TypeError] Cannot read property '1' of null` exception or any other transpilation error when you `npm run build`, check if your code satisifes the following rules:
+If you see a `[TypeError] Cannot read property '1' of null` exception or any other transpilation error when you `npm run build`, check if your code satisfies the following rules:
 
 - don't put empty lines inside your methods
 - always use Python-style indentation, it is preserved as is for all languages
@@ -246,19 +344,20 @@ If the transpiling process finishes successfully, but generates incorrect Python
 - every opening bracket like `(` or `{` should have a space before it!
 - do not use language-specific code syntax sugar, even if you really want to
 - unfold all maps and comprehensions to basic for-loops
-- don't change the arguments of overrided inherited methods, keep them uniform across all exchanges
-- do everything with base class methods only (for example, use `this.json ()` for converting objects to json).
+- don't change the arguments of overridden inherited methods, keep them uniform across all exchanges
+- everything should be done using base class methods only (for example, use `this.json ()` for converting objects to json)
 - always put a semicolon `;` at the end of each statement, as in PHP/C-style
-- all associative keys must be single-quoted strings everywhere, `array['good'], array.bad`
-- variables should be declared with `const` or `let` keywords semantically (no `var`!), prefer `const` everywhere
+- all associative keys must be single-quoted strings everywhere (`array['good']`), do not use the dot notation (`array.bad`)
+- never use the `var` keyword, instead use `const` for constants or `let` for variables
 
 And structurally:
 
 - if you need another base method you will have to implement it in all three languages
-- do not issue more than one HTTP request from a unified method
-- try to reduce syntax to basic one-liner expressions
-- multiple lines are ok, but you should avoid deep nesting with lots of brackets
+- try not to issue more than one HTTP request from a unified method
 - avoid changing the contents of the arguments and params passed by reference into function calls
+- keep it simple, don't do more than one statement in one line
+- try to reduce syntax & logic (if possible) to basic one-liner expressions
+- multiple lines are ok, but you should avoid deep nesting with lots of brackets
 - do not use conditional statements that are too complex (heavy if-bracketing)
 - do not use heavy ternary conditionals
 - avoid operators clutter (**don't do this**: `a && b || c ? d + 80 : e ** f`)
@@ -268,7 +367,7 @@ And structurally:
 - do not use the `in` operator to check if a value is in a non-associative array (list)
 - don't add custom currency or symbol/pair conversions and formatting, copy from existing code instead
 - **don't access non-existent keys, `array['key'] || {}` won't work in other languages!**
-- keep it simple, don't do more than one statement in one line
+- an empty container is ambiguous in PHP: `{}` and `[]` are both `array()` there, so `isDictionary` returns `true` for an empty array in PHP while every other language can tell them apart and returns `false` — never branch dict-vs-list logic on a possibly-empty container, and don't assert empty containers in shared tests, see https://github.com/ccxt/ccxt/pull/29704 and https://github.com/ccxt/ccxt/pull/29698
 
 #### Sending Market Ids
 
@@ -281,7 +380,7 @@ Most of exchanges' API endpoints will require an exchange-specific market symbol
 
 **NEVER DO THIS:**
 
-```JavaScript
+```javascript
 async fetchTicker (symbol, params = {}) {
    const request = {
       'pair': symbol, // very bad, sending unified symbols to the exchange directly
@@ -293,7 +392,7 @@ async fetchTicker (symbol, params = {}) {
 
 **DO NOT DO THIS EITHER:**
 
-```JavaScript
+```javascript
 async fetchTicker (symbol, params = {}) {
    const request = {
       'symbol': symbol, // very bad, sending unified symbols to the exchange directly
@@ -312,22 +411,22 @@ To get the exchange-specific market-id by a unified CCXT symbol, use the followi
 
 **GOOD EXAMPLES:**
 
-```JavaScript
+```javascript
 async fetchTicker (symbol, params = {}) {
    const market = this.market (symbol); // the entire market structure
    const request = {
-      'pair': market['id'], // good, they may me equal, but often differ, it's ok
+      'pair': market['id'], // good, they may be equal, but often differ, it's ok
    };
    const response = await this.publicGetEndpoint (this.extend (request, params));
    // parse in a unified way...
 }
 ```
 
-```JavaScript
+```javascript
 async fetchTicker (symbol, params = {}) {
    const marketId = this.marketId (symbol); // just the id
    const request = {
-      'symbol': marketId, // good, they may me equal, but often differ, it's ok
+      'symbol': marketId, // good, they may be equal, but often differ, it's ok
    };
    const response = await this.publicGetEndpoint (this.extend (request, params));
    // parse in a unified way...
@@ -336,7 +435,7 @@ async fetchTicker (symbol, params = {}) {
 
 #### Parsing Symbols
 
-When sending requests to the exchange unified symbols have to be _"converted"_ to exchange-specific market-`id`s like shown above. The same is true on the other side – when receiving an exchange response it has an exchange-specific market-`id` inside it that has to be _"converted back"_ to a unified CCXT symbol.
+When sending requests to the exchange unified symbols have to be _"converted"_ to exchange-specific market-`id`s like shown above. The same is true on the other end – when receiving an exchange response it has an exchange-specific market-`id` inside it that has to be _"converted back"_ to a unified CCXT symbol.
 
 **We don't put exchange-specific market-`id`s in unified structures directly!** We can't freely interchange symbols with ids! There is a significant difference between an *exchange-specific market-ids* and *unified symbols*! This is explained in the Manual, here:
 
@@ -345,7 +444,7 @@ When sending requests to the exchange unified symbols have to be _"converted"_ t
 
 **NEVER DO THIS:**:
 
-```JavaScript
+```javascript
 parseTrade (trade, market = undefined) {
    // parsing code...
    return {
@@ -358,7 +457,7 @@ parseTrade (trade, market = undefined) {
 
 **DO NOT DO THIS EITHER**
 
-```JavaScript
+```javascript
 parseTrade (trade, market = undefined) {
    // parsing code...
    return {
@@ -373,29 +472,16 @@ In order to handle the market-`id` properly it has to be looked-up in the info c
 
 **GOOD EXAMPLE:**
 
-```JavaScript
+```javascript
 parseTrade (trade, market = undefined) {
-   let symbol = undefined;
-   const marketId = this.safeString (trade, 'pair');
-   if (marketId !== undefined) {
-      if (marketId in this.markets_by_id) {
-         // look up by an exchange-specific id in the preloaded markets first
-         market = this.markets_by_id[market];
-         symbol = market['symbol'];
-      } else {
-         // try to parse it somehow, if the format is known
-         const [ baseId, quoteId ] = marketId.split ('/');
-         const base = this.safeCurrencyCode (baseId); // unified
-         const quote = this.safeCurrencyCode (quoteId);
-         symbol = base + '/' + quote;
-      }
-   }
-   // parsing code...
-   return {
-      'info': trade,
-      'symbol': symbol, // very good, a unified symbol here now
-      // other fields...
-   };
+    const marketId = this.safeString (trade, 'pair');
+    // safeSymbol is used to parse the market id to a unified symbol
+    const symbol = this.safeSymbol (marketId, market);
+    return {
+       'info': trade,
+       'symbol': symbol, // very good, a unified symbol here now
+       // other fields...
+    };
 }
 ```
 
@@ -408,15 +494,15 @@ In JavaScript, dictionary keys can be accessed in two notations:
 
 Both work almost identically, and one is implicitly converted to another upon executing the JavaScript code.
 
-While the above does work in JavaScript, it will not work in Python or PHP. In most languages, associative dictionary keys are not treated in the same way as properties. Therefore, in Python `object.key` is not the same as `object['key']`. In PHP `$object->key` is not the same as `$object['key']` as well. Languages that differentiate between associative keys and properties use different notations for the two.
+While the above does work in JavaScript, **it will not work in Python or PHP**. In most languages, associative dictionary keys are not treated in the same way as properties. Therefore, in Python `object.key` is not the same as `object['key']`. In PHP `$object->key` is not the same as `$object['key']` as well. Languages that differentiate between associative keys and properties use different notations for the two.
 
-To keep the code transpileable, please, remeber this simple rule: *always use the single-quoted string key notation `object['key']` for accessing all associative dictionary keys in all languages everywhere throughout this library!*
+To keep the code transpileable, please, remember this simple rule: *always use the single-quoted string key notation `object['key']` for accessing all associative dictionary keys in all languages everywhere throughout this library!*
 
 #### Sanitizing Input With `safe`-Methods
 
 JavaScript is less restrictive than other languages. It will tolerate an attempt to dereference a non-existent key where other languages will throw an Exception:
 
-```JavaScript
+```javascript
 // JavaScript
 
 const someObject = {}
@@ -430,7 +516,7 @@ if (someObject['nonExistentKey']) {
 
 However, the above logic with *"an undefined value by default"* will not work in Python or PHP.
 
-```Python
+```python
 # Python
 some_dictionary = {}
 
@@ -452,7 +538,7 @@ Most languages will not tolerate an attempt to access a non-existent key in an o
 
 For the above reasons, please, **never do this** in the transpiled JS files:
 
-```JavaScript
+```javascript
 // JavaScript
 const value = object['key'] || other_value; // will not work in Python or PHP!
 if (object['key'] || other_value) { /* will not work in Python or PHP! */ }
@@ -460,27 +546,40 @@ if (object['key'] || other_value) { /* will not work in Python or PHP! */ }
 
 Therefore we have a family of `safe*` functions:
 
-- `safeInteger (object, key)`, `safeInteger2 (object, key1, key2)`
-- `safeFloat (object, key)`, `safeFloat2 (object, key1, key2)`
-- `safeString (object, key)`, `safeString2 (object, key1, key2)`
-- `safeValue (object, key)`, `safeValue2 (object, key1, key2)`
+- `safeInteger (object, key, default)`, `safeInteger2 (object, key1, key2, default)` –for parsing timestamps in milliseconds
+- `safeNumber (object, key, default)`, `safeNumber2 (object, key1, key2, default)` – for parsing amounts, prices, costs
+- `safeString (object, key, default)`, `safeString2 (object, key1, key2, default)` – for parsing ids, types, statuses
+- `safeStringLower (object, key, default)`, `safeStringLower2 (object, key1, key2, default)` – for parsing and turning to lowercase
+- `safeStringUpper (object, key, default)`, `safeStringUpper2 (object, key1, key2, default)` – for parsing and turning to uppercase
+- `safeBool(object, key, default)` - for parsing bools inside dictionaries and arrays/lists
+- `safeList(object, key, default)` - for parsing lists/arrays inside dictionaries and arrays/lists
+- `safeDict(object, key, default)` - for parsing dictionaries inside dictionaries and arrays/lists
+- `safeValue (object, key, default)`, `safeValue2 (object, key1, key2, default)` – for parsing objects (dictionaries) and arrays (lists)
+- `safeTimestamp (object, key, default)`, `safeTimestamp2 (object, key1, key2, default)` – for parsing UNIX timestamps in seconds
 
-The `safeValue` function is used for objects inside objects, arrays inside objects and boolean `true/false` values.
+The `safeValue` function is used for objects inside objects, arrays inside objects and boolean `true/false` values (**deprecated, use it only when you don't know exactly which type is going to be returned, otherwise prefer** `safeBool/safeDict/safeList`).
 
-The above safe-functions will check for the existence of the key in the object and will properly return `undefined/None/null` values for JS/Python/PHP. Each function also accepts the default value to be returned instead of `undefined/None/null` in the last argument.
+If you need to search for several different keys within an object you have available the `safeMethodN` function's family that allows for a search with an arbitrary number of keys by accepting an array of keys as an argument.
+
+```javascript
+const price = this.safeStringN (object, [ 'key1', 'key2', 'key3' ], defaultValue)
+```
+For every safe method listed above, there is the correspondent `safeMethodN` too.
+
+The above safe-functions will check for the existence of the `key` (or `key1`, `key2`) in the object and will properly return `undefined/None/null` values for JS/Python/PHP. Each function also accepts the `default` value to be returned instead of `undefined/None/null` in the last argument.
 
 Alternatively, you could check for the key existence first...
 
 So, you have to change this:
 
-```JavaScript
+```javascript
 if (params['foo'] !== undefined) {
 }
 ```
 
 ↓
 
-```JavaScript
+```javascript
 const foo = this.safeValue (params, 'foo');
 if (foo !== undefined) {
 }
@@ -488,7 +587,7 @@ if (foo !== undefined) {
 
 Or:
 
-```JavaScript
+```javascript
 if ('foo' in params) {
 }
 ```
@@ -536,19 +635,23 @@ The `hmac()` method also supports `'base64'` for the `digest` argument. This is 
 
 #### Timestamps
 
-**All timestamps throughout all unified structures within this library are integer timestamp _in milliseconds_!**
+**All timestamps throughout all unified structures within this library are integer UTC timestamps _in milliseconds_!**
 
-In order to convert to milliseconds timestamps, CCXT implementes the following methods:
+In order to convert to milliseconds timestamps, CCXT implements the following methods:
 
-```JavaScript
+```javascript
 const data = {
    'unixTimestampInSeconds': 1565242530,
    'unixTimestampInMilliseconds': 1565242530165,
+   'unixTimestampAsDecimal': 1565242530.165,
    'stringInSeconds': '1565242530',
 };
 
 // convert to integer if the underlying value is already in milliseconds
 const timestamp = this.safeInteger (data, 'unixTimestampInMilliseconds'); // === 1565242530165
+
+// convert to integer and multiply by a thousand if the value has milliseconds after dot
+const timestamp = this.safeTimestamp (data, 'unixTimestampAsDecimal'); // === 1565242530165
 
 // convert to integer and multiply by a thousand if the value is a UNIX timestamp in seconds
 const timestamp = this.safeTimestamp (data, 'unixTimestampInSeconds'); // === 1565242530000
@@ -561,7 +664,7 @@ const timestamp = this.safeTimestamp (data, 'stringInSeconds'); // === 156524253
 
 In JavaScript the common syntax to get a length of a string or an array is to reference the `.length` property like shown here:
 
-```JavaScript
+```javascript
 someArray.length
 
 // or
@@ -571,7 +674,7 @@ someString.length
 
 And it works for both strings and arrays. In Python this is done in a similar way:
 
-```Python
+```python
 len(some_array)
 
 # or
@@ -583,7 +686,7 @@ So the length is accessible in the same way for both strings and arrays and both
 
 However, with PHP this is different, so the syntax for string lengths and array lengths is different:
 
-```PHP
+```php
 count(some_array);
 
 // or
@@ -593,7 +696,7 @@ strlen(some_string); // or mb_strlen
 
 Because the transpiler works line-by-line and does no code introspection, it cannot tell arrays from strings and cannot properly transpile `.length` to PHP without additional hinting. It will always transpile JS `.length` to PHP `strlen` and will prefer string lengths over array lengths. In order to indicate an array length properly we have to do the following:
 
-```JavaScript
+```javascript
 const arrayLength = someArray.length;
 // the above line ends with .length;
 // that ending is a hint for the transpiler that will recognize someArray
@@ -605,28 +708,90 @@ That `.length;` line ending does the trick. The only case when the array `.lengt
 
 #### Adding Numbers And Concatenating Strings
 
-In JS the arithmetic addition `+` operator handles both strings and numbers. So, it can concatenate strings with `+` and can sum up numbers with `+` as well. The same is true with Python. With PHP this is different, so it has different operators for string concatenation (the "dot" operator `.`) and for arithmetic addition (the "plus" operator `+`). Once again, because the transpiler does no code introspection it cannot tell if you're adding up numbers or strings in JS. This works fine until you want to transpile this to other languages, be it PHP or whatever other language it is. In order to help the transpiler we have to use `this.sum` for arithmetic additions.
+In JS the arithmetic addition `+` operator handles both strings and numbers. So, it can concatenate strings with `+` and can sum up numbers with `+` as well. The same is true with Python. With PHP this is different, so it has different operators for string concatenation (the "dot" operator `.`) and for arithmetic addition (the "plus" operator `+`). Once again, because the transpiler does no code introspection it cannot tell if you're adding up numbers or strings in JS. This works fine until you want to transpile this to other languages, be it PHP or whatever other language it is.
 
-The rule of thumb is: **`+` is for string concatenation only (!)** and **`this.sum (a, b, c, ...)` is for arithmetic additions**. The same logic applies to operator `+=` vs operator `.=` – `this.sum()` has to be used in those cases as well.
+There's this aspect of representation of numbers throughout the lib.
+The existing approach documented in the Manual says that the library will accept and will return "floats everywhere" for amounts, prices, costs, etc.
+Using floats is the easiest way of onboarding new users.
+This has known quirks, it's impossible to represent exact numbers with floats (https://0.30000000000000004.com/)
+
+To address that, we are switching to string-based representations everywhere.
+So, we are now in the process of moving towards strings in a non-breaking way.
+
+The new approach is:
+
+We are adding an internal layer for string-based representations and string-based maths in the response parsers.
+That internal layer is built on top of the base `Precise` class, that is used to do all string-based maths.
+That class requires strings to operate on them and it will return strings as well.
+All existing old parsers must be rewritten to use `Precise` string-based representations, on first-encounter.
+All new code of all new parsers must be initially written with `Precise` string-based representations.
+
+What exactly that means:
+
+Compare this pseudocode showing how it was done **before** (an example of some arbitrary parsing code for the purpose of explaining it):
+
+```javascript
+const amount = this.safeFloat (order, 'amount');
+const remaining = this.safeFloat (order, 'remaining');
+if (remaining > 0) {
+    status = 'open';
+} else {
+    status = 'closed';
+}
+// ...
+return {
+    // ...
+    'amount': amount,
+    'remaining': remaining,
+    'status': status,
+    // ...
+};
+```
+
+This is how we should do it **from now on**:
+
+```javascript
+const amount = this.safeNumber (order, 'amount'); // internal string-layer
+const remaining = this.safeString (order, 'remaining'); // internal string-layer
+if (Precise.stringGt (remaining, '0')) { // internal string-layer
+    status = 'open';
+} else {
+    status = 'closed';
+}
+// ...
+return {
+    // ...
+    'amount': amount, // external layer, goes to the user
+    'remaining': this.parseNumber (remaining), // external layer, goes to the user
+    'status': status,
+    // ...
+};
+```
+
+In all new code of all parsers we should use string-based numbers throughout the body of the parser. Also we should add `parseNumber` as the last step of handling numeric values upon returning the result to the caller. The above two snippets are just examples, showing the usage of `Precise` with `safeString` and `parseNumber`. The actual parsers of orders also involve safeOrder-methods: https://github.com/ccxt/ccxt/pulls?q=safeOrder2.
+
+The user will ultimately have an option to choose which implementation of parseNumber he wants: the one returning floats or the one returning strings. This way everyone will remain happy and the library will work both ways in a non-breaking fashion.
+
+The rule of thumb is: **`+` is for string concatenation only (!)** and **ALL arithmetic operations must use `Precise`**.
 
 #### Formatting Decimal Numbers To Precision
 
-The `.toFixed ()` method has [known rounding bugs](https://www.google.com/search?q=toFixed+bug) in JavaScript, and so do the other rounding methods in the other languages as well. In order to work with number formatting consistently, we need to use the [`decimalToPrecision` method as described in the Manual](https://github.com/ccxt/ccxt/wiki/Manual#methods-for-formatting-decimals).
+This section covers the request-assembly part. The `.toFixed ()` method has [known rounding bugs](https://www.google.com/search?q=toFixed+bug) in JavaScript, and so do the other rounding methods in the other languages as well. In order to work with number formatting consistently use the [`decimalToPrecision` method as described in the Manual](https://github.com/ccxt/ccxt/wiki/Manual#methods-for-formatting-decimals).
 
 #### Escaped Control Characters
 
-When using strings containing control characters like `"\n"`, `"\t"`, always enclose them in double quotes (`"`), not single quotes (`'`)! Single-quoted strings are not parsed for control characters and are treated as is in many languages apart from JavaScript. Therefore for tabs and newlines to work in PHP, we need to surround them with double quotes (especially in the `sign()` implementation).
+When using strings containing control characters like `"\n"`, `"\t"`, always enclose them in double quotes (`"`), not single quotes (`'`)! Single-quoted strings are not parsed for control characters and are treated as is in many languages apart from TypeScript. Therefore for tabs and newlines to work in PHP, we need to surround them with double quotes (especially in the `sign()` implementation).
 
 Bad:
 
-```JavaScript
+```javascript
 const a = 'GET' + method.toLowerCase () + '\n' + path;
 const b = 'api\nfoobar.com\n';
 ```
 
 Good:
 
-```JavaScript
+```javascript
 const a = 'GET' + method.toLowerCase () + "\n" + path; // eslint-disable-line quotes
 // eslint-disable-next-line quotes
 const b = "api\nfoobar.com\n";
@@ -644,21 +809,21 @@ The brackets are needed to hint the transpiler which part of the conditional is 
 
 Here are some examples of a badly-designed code that will break the transpiler:
 
-```JavaScript
-// this is an example of bad codestyle that will likely break the transpiler
+```javascript
+// this is an example of bad code style that will likely break the transpiler
 const foo = {
    'bar': 'a' + qux === 'baz' ? this.a () : this.b () + 'b',
 };
 ```
 
-```JavaScript
+```javascript
 // this confuses the transpiler and a human developer as well
 const foo = 'bar' + baz + qux ? 'a' : '' + this.c ();
 ```
 
 Adding surrounding brackets to corresponding parts would be a more or less correct way to resolve it.
 
-```JavaScript
+```javascript
 const foo = {
    'bar': (qux === 'baz') ? this.a () : this.b (), // much better now
 };
@@ -666,7 +831,7 @@ const foo = {
 
 The universally-working way to solve it is to just break the complex line into a few simpler lines, even at a cost of adding extra lines and conditionals:
 
-```JavaScript
+```javascript
 // before:
 // const foo = {
 //    'bar': 'a' + qux === 'baz' ? this.a () : this.b () + 'b',
@@ -681,7 +846,7 @@ const foo = {
 
 Or even:
 
-```JavaScript
+```javascript
 // before:
 // const foo = 'bar' + baz + qux ? 'a' : '' + this.c ();
 // ----------------------------------------------------------------------------
@@ -707,6 +872,7 @@ foo += this.c ();
 - respect default argument values in `fetch`-methods, check if `since` and `limit` are `undefined` and do not send them to the exchange, we intentionally use the exchanges' defaults in such cases
 - when implementing a unified method that has some arguments – we can't ignore or miss any of those arguments
 - all structures returned from the unified methods must conform to their specifications from the Manual
+- all API endpoints have to be listed out with proper support for params substituted in the URLs
 
 Please, see the following document for new integrations: https://github.com/ccxt/ccxt/wiki/Requirements
 
@@ -765,15 +931,110 @@ Upon instantiation the base exchange class takes each URL from its list of endpo
 
 ```UNDER CONSTRUCTION```
 
+### Docstrings
+
+- when a method takes another parameter as a property on params (ex. `params['something']`) add that parameter to the docstring, as params.something
+   - if that parameter is required, the type is `{string}`, `{int}`, `{object}`, `{etc}`, if it's optional the type stays the same and the name is wrapped in square brackets, as `@param {string} [params.something]`
+- when a parameter's default value is `undefined`, but the method contains something like `if (symbol === undefined) { throw new ArgumentsRequired('...')}`, then document that parameter as required, `@param {string} symbol`. If an error is not thrown, then it is optional, `@param {string} [symbol]`
+- always write the type names in their TypeScript form — the transpiler rewrites them per language, so `{string}` becomes `str` and `{object}` becomes `dict` in Python, `{object}` becomes `array` in PHP, and `{int}`, `{float}` and `{boolean}` are carried over unchanged
+- if a method doesn't use one of the unified parameters, set the description of that parameter to `not used by exchange_name.method_name ()` (replace `exchange_name` and `method_name` with the real exchange and method names)
+- if the method has any other special case uses, put these in the description of the docstring, these cases can be included in the class docstring as well
+
 ### Continuous Integration
 
-Builds are automated with [Travis CI](https://travis-ci.org/ccxt/ccxt). The build steps for Travis CI are described in the [`.travis.yml`](https://github.com/ccxt/ccxt/blob/master/.travis.yml) file.
+Builds are automated with [Travis CI](https://app.travis-ci.com/github/ccxt/ccxt). The build steps for Travis CI are described in the [`.travis.yml`](https://github.com/ccxt/ccxt/blob/master/.travis.yml) file.
 
 Windows builds are automated with [Appveyor](https://ci.appveyor.com/project/ccxt/ccxt). The build steps for Appveyor are in the [`appveyor.yml`](https://github.com/ccxt/ccxt/blob/master/appveyor.yml) file.
 
-Incoming pull requests are automatically validated by the CI service. You can watch the build process online here: [travis-ci.org/ccxt/ccxt/builds](https://travis-ci.org/ccxt/ccxt/builds).
+Incoming pull requests are automatically validated by the CI service. You can watch the build process online here: [app.travis-ci.com/github/ccxt/ccxt/builds](https://app.travis-ci.com/github/ccxt/ccxt/builds).
 
 ### How To Build & Run Tests On Your Local Machine
+
+### Offline tests
+CCXT has various offline tests that help ensure we don't introduce regressions upon adding a new feature or patching a bug. They are effortless and fast to run (since they don't require access to the exchanges), so they should be part of our development flow at CCXT.
+
+
+They include the base tests (precision, crypto, orderbook, etc) and static (request/response) tests.
+
+These tests are located in the folder `ts/src/test/base/functions/`; most of their content is automatically transpilable to every language; therefore, the same code conventions apply.
+
+You can run them by doing: `npm run test-base` and `npm run-test-ws`
+
+Static tests are also offline but they work differently because they emulate a unified ccxt call (createOrder/fetchTickers/etc)  and they mock the server's response and/or assert the validity of the generated HTTP request.
+
+**Request-static**:
+- They emulate the HTTP request, stop it before it tries to connect and assert that the url/body are properly formed.
+
+Folder: `ts/src/test/static/request/`
+
+You can create a static-request test by running this command and pasting the result in the correct file (eg: `static/request/binance.json`)
+
+```shell
+npm run cli.ts -- binance fetchTrades "BTC/USDT:USDT" --request
+````
+
+The `output` field holds the expected HTTP body. When that body is itself JSON, store it
+as a JSON object (or array) so the fixture stays valid RFC 8259 and readable:
+
+```json
+"output": { "symbol": "BTC_USDT_PERP", "side": "BUY", "type": "LIMIT", "sz": "1", "px": "84000" }
+```
+
+The request comparator already parses string `output` values as JSON when `outputType` is
+`json`, so an object and a stringified object compare the same. Query-string bodies stay
+plain strings (`"symbol=BTCUSDT&side=BUY"`).
+
+
+**Response-static**
+- Emulate a mocked response from the server and assert the CCXT parses the raw HTTP response correctly.
+
+Folder: `ts/src/test/static/response/binance.json`
+
+You can create a static-response test by running this command and pasting the result in the correct file (eg: `static/response/binance.json`)
+
+```shell
+npm run cli.ts -- binance fetchTrades "BTC/USDT:USDT"  undefined 1 --response
+````
+#### Adding Exchange Credentials
+
+CCXT has tests for both the public API and the private authenticated API. By default, CCXT's built-in tests will only test the public APIs, because the code repository does not include the [API keys](https://github.com/ccxt/ccxt/wiki/Manual#authentication) that are required for the private API tests. Also, the included private tests will not alter the balance of the account in any way, all tests are non-intrusive. In order to enable private API testing, one must configure the API keys. That can be done either in `keys.local.json` or with the `env` variables.
+
+##### Configuring API keys and options in `keys.local.json`
+
+Exchange API keys can be added to the `keys.local.json` in the root folder inside the repository. If it does not exist on your side – create it first. That file is in `.gitignore` and in `.npmignore`. You can add exchange credentials and various options for different exchanges to the `keys.local.json` file.
+
+An example of `keys.local.json` file:
+
+```json
+{
+    "okx": {
+        "apiKey": "XXX",
+        "secret": "YYY"
+    },
+    "binance": {
+        "apiKey": "XXX",
+        "secret": "YYY",
+        "options": {
+            "some-option": "some value"
+        }
+    },
+    // ...
+}
+```
+
+##### Configuring API keys as environment variables
+
+You can also define API keys as `env` variables:
+
+- https://www.google.com/search?q=set+env+variable+linux
+- https://www.google.com/search?q=set+env+variable+mac
+- https://www.google.com/search?q=set+env+variable+windows
+
+Consult the docs for your OS and shell on how to set an environment variable. Most of the time a `set` command, or a `export` command will work. The `env` command might help check the already-set environment variables.
+
+Examples of `env` variables: `BINANCE_APIKEY`, `BINANCE_SECRET`, `KRAKEN_APIKEY`, `KRAKEN_SECRET`, etc.
+
+#### Building
 
 Before building for the first time, install Node dependencies (skip this step if you're running our Docker image):
 
@@ -781,11 +1042,13 @@ Before building for the first time, install Node dependencies (skip this step if
 npm install
 ```
 
-The command below will build everything and generate PHP/Python versions from source JS files:
+The command below will build everything and generate PHP/Python versions from source TS files:
 
 ```
 npm run build
 ```
+
+#### Testing
 
 The following command will test the built generated files (for all exchanges, symbols and languages):
 
@@ -796,49 +1059,68 @@ node run-tests
 You can restrict tests to a specific language, a particular exchange or symbol:
 
 ```
-node run-tests [--php] [--js] [--python] [--python3] [exchange] [symbol]
+node run-tests [--js] [--python] [--python-async] [--php] [--php-async] [exchange] [symbol]
 ```
+
+The `node run-tests exchangename` will try 5 tests: `js`, `python`, `python-async`, `php`, `php-async`. You can control that like so:
+
+```
+node run-tests exchange --js
+node run-tests exchange --js --python-async
+node run-tests exchange --js --php
+node run-tests exchange --python --python-async
+...
+```
+
+However, if that fails, you might have to bury one level lower and run language-specific tests to see what exactly is wrong:
+
+```
+node js/test/test exchange --verbose
+python3 python/ccxt/test/test_sync.py exchange --verbose
+python3 python/ccxt/test/test_async.py exchange --verbose
+php -f php/test/test_sync.php exchange --verbose
+php -f php/test/test_async.php exchange --verbose
+```
+
+The `test_sync` is just a synchronous version of `test_async`, so in most cases just running `test_async.py` and `test_async.php` is enough:
+
+```
+node js/test/test exchange --verbose
+python3 python/ccxt/test/test_async.py exchange --verbose
+php -f php/test/test_async.php exchange --verbose
+```
+
+When all of the language-specific tests work, then node run-tests will also succeed. In order to run those tests you want to make sure that the build has completed successfully.
 
 For example, the first of the following lines will only test the source JS version of the library (`ccxt.js`). It does not require an `npm run build` before running it (can be useful if you need to verify quickly whether your changes break the code or not):
 
 ```shell
 
-node run-tests --js             # test master ccxt.js, all exchanges
+node run-tests --js                  # test master ccxt.js, all exchanges
 
 # other examples require the 'npm run build' to run
 
-node run-tests --python         # test Python 2 version, all exchanges
-node run-tests --php bitfinex   # test Bitfinex with PHP
-node run-tests --python3 kraken # test Kraken with Python 3, requires 'npm run build'
+node run-tests --python              # test Python sync version, all exchanges
+node run-tests --php bitfinex        # test Bitfinex with PHP
+node run-tests --python-async kraken # test Kraken with Python async test, requires 'npm run build'
 ```
+
+#### Writing Tests
+
+Follow this steps to add a test:
+
+- Create a file in [ts/tests/Exchange](https://github.com/ccxt/ccxt/tree/master/ts/test/Exchange) following syntax that can be transpiled.
+- Add test to `runPrivateTests` or `runPublicTests` to [ts/src/test/tests.ts](https://github.com/ccxt/ccxt/blob/master/ts/src/test/tests.ts#L354) or for ccxt.pro endpoints to [ts/src/pro/test/tests.ts](https://github.com/ccxt/ccxt/blob/master/ts/src/pro/test/tests.ts#L121)
+- run `npm run transpile` to generate the test file in javascript, python and php.
+- Call tests `node run-tests`
 
 ## Committing Changes To The Repository
 
-The build process generates many changes in the transpiled exchange files, e.g. for Python and PHP. **You should NOT commit them to GitHub, commit only the base (JS) file changes please**.
-
-You can hide the changes in the generated files by running this command (after that, the generated files are no longer marked as changed):
-
-```
-npm run git-ignore-generated-files
-```
-
-Previously we had that command implemented as a final build step, but it caused problems with subsequent `git pull` and also branch selection commands (when a conflict occured in those files that have been marked as ignored). So if you experience an issue with that, you can un-ignore those files by executing:
-
-```
-npm run git-unignore-generated-files
-```
+The build process generates many changes in the transpiled exchange files, e.g. for Python and PHP. **You should NOT commit them to GitHub, commit only the base (TS) file changes please**.
 
 ## Financial Contributions
 
 We also welcome financial contributions in full transparency on our [open collective](https://opencollective.com/ccxt).
-Anyone can file an expense. If the expense makes sense for the development of the community, it will be "merged" in the ledger of our open collective by the core contributors and the person who filed the expense will be reimbursed.
-
-```
-ETH 0x26a3CB49578F07000575405a57888681249c35Fd (ETH only!)
-BTC 33RmVRfhK2WZVQR1R83h2e9yXoqRNDvJva
-BCH 1GN9p233TvNcNQFthCgfiHUnj5JRKEc2Ze
-LTC LbT8mkAqQBphc4yxLXEDgYDfEax74et3bP
-```
 
 ## Credits
 
@@ -846,7 +1128,7 @@ LTC LbT8mkAqQBphc4yxLXEDgYDfEax74et3bP
 
 Thank you to all the people who have already contributed to ccxt!
 
-<a href="graphs/contributors"><img src="https://opencollective.com/ccxt/contributors.svg?width=890" /></a>
+<a href="https://github.com/ccxt/ccxt/graphs/contributors"><img src="https://opencollective.com/ccxt/contributors.svg?width=890" /></a>
 
 ### Backers
 

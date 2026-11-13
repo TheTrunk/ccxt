@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 
@@ -25,9 +29,7 @@ async def fetch_ticker(exchange, symbol):
 
 
 async def fetch_tickers(id):
-    exchange = getattr(ccxt, id)({
-      'enableRateLimit': True,  # this option enables the built-in rate limiter
-    })
+    exchange = getattr(ccxt, id)()
     await exchange.load_markets()
     print(exchange.id, 'fetching all tickers by simultaneous multiple concurrent requests')
     symbols_to_load = get_active_symbols(exchange)
@@ -42,4 +44,4 @@ async def fetch_tickers(id):
     await exchange.close()
 
 
-asyncio.get_event_loop().run_until_complete(fetch_tickers('theocean'))
+run(fetch_tickers('theocean'))

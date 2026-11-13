@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 
@@ -15,18 +19,18 @@ async def test(exchange):
     await exchange.close()
 
 
-kraken = ccxt.kraken({
-    'apiKey': "hEvQNMDIeoCJbr7W/ZBb5CGOrx3G0lWF5B3zqa1JBxdZlEaL8EK+D0Mw",
-    'secret': "JaE9wI6Nwgh5oRxiHcVxurwzwBxwc05W/qv/k1srGg4s3EYuXPpNkLLM5NYbbWpM8rCyijIeDavRuqWbU0ZV9A==",
-    'verbose': True,  # switch it to False if you don't want the HTTP log
-})
-bitfinex = ccxt.bitfinex({
-    'apiKey': "4FlEDtxDl35gdEiobnfZ72vJeZteE4Bb7JdvqzjIjHq",
-    'secret': "D4DXM8DZdHuAq9YptUsb42aWT1XBnGlIJgLi8a7tzFH",
-    'verbose': True,  # switch it to False if you don't want the HTTP log
-})
+async def main():
+    kraken = ccxt.kraken({
+        'apiKey': "YOUR_API_KEY",
+        'secret': "YOUR_SECRET",
+        'verbose': True,  # switch it to False if you don't want the HTTP log
+    })
+    bitfinex = ccxt.bitfinex({
+        'apiKey': "YOUR_API_KEY",
+        'secret': "YOUR_SECRET",
+        'verbose': True,  # switch it to False if you don't want the HTTP log
+    })
+    await asyncio.gather(*[test(exchange) for exchange in [kraken, bitfinex]])
 
-[asyncio.ensure_future(test(exchange)) for exchange in [kraken, bitfinex]]
-pending = asyncio.Task.all_tasks()
-loop = asyncio.get_event_loop()
-loop.run_until_complete(asyncio.gather(*pending))
+
+run(main())

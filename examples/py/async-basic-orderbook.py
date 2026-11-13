@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import asyncio
+from importlib import import_module
+from importlib.util import find_spec
+
+run = import_module(next(filter(find_spec, ('uvloop', 'winloop', 'asyncio')))).run
 import os
 import sys
 
@@ -12,12 +15,9 @@ import ccxt.async_support as ccxt  # noqa: E402
 
 async def test():
 
-    exchange = ccxt.okex({
-
+    exchange = ccxt.okx({
         # 'proxy': 'https://cors-anywhere.herokuapp.com/',
         # 'origin': 'foobar',  # when using CORS proxies, set this to some random string
-
-        'enableRateLimit': True,  # required accoding to the Manual
     })
 
     try:
@@ -29,5 +29,4 @@ async def test():
         raise e
 
 
-if __name__ == '__main__':
-    print(asyncio.get_event_loop().run_until_complete(test()))
+run(test())
